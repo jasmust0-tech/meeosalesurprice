@@ -364,7 +364,23 @@ function loadSettingsFromFile() {
   } catch {}
 }
 
+// Environment variables are authoritative for Cashfree: when CASHFREE_CLIENT_ID
+// or CASHFREE_SECRET_KEY are set, they override any stored (Firestore / local)
+// cashfree settings. This guarantees keys set in Vercel always take effect even
+// if an older, empty cashfree config was persisted to the database.
+function applyEnvCashfree() {
+  const hasEnv = process.env.CASHFREE_CLIENT_ID || process.env.CASHFREE_SECRET_KEY;
+  if (!hasEnv) return;
+  settingsStore.cashfree = {
+    enabled: process.env.CASHFREE_ENABLED === "true",
+    environment: process.env.CASHFREE_ENVIRONMENT === "prod" ? "prod" : "sandbox",
+    clientId: process.env.CASHFREE_CLIENT_ID || "",
+    secretKey: process.env.CASHFREE_SECRET_KEY || "",
+  };
+}
+
 loadSettingsFromFile();
+applyEnvCashfree();
 loadOrdersFromFile();
 
 // --- Admin auth (stateless HMAC-signed token) ---
@@ -828,6 +844,8 @@ app.post("/api/admin/hard-reset", authMiddleware, async (req, res) => {
 
 // Ensure settings are loaded from db once initialized
 loadSettingsFromDb().then(() => {
+  // Env vars win over whatever the database restored.
+  applyEnvCashfree();
   // Reconnect against whatever firebase config got loaded (env / file / db).
   initDbFromSettings();
 });
