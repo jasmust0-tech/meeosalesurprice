@@ -38,6 +38,12 @@ export function CheckoutPayment() {
   const [paymentErrorMsg, setPaymentErrorMsg] = useState('');
   const [timeLeft, setTimeLeft] = useState(300);
   const [cashfreeEnabled, setCashfreeEnabled] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+
+  // When the user arrives from the "Continue" button the payment-method list is
+  // skipped entirely: we go straight to the Cashfree checkout (or show the
+  // error on a Cashfree-only screen).
+  const cashfreeOnly = (location.state as any)?.autoCashfree === true;
 
   const rawItems = location.state?.items;
   const rawProduct = location.state?.product;
@@ -159,7 +165,8 @@ export function CheckoutPayment() {
           if (enabled) setSelectedMethod('cashfree');
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setConfigLoading(false));
   }, []);
 
   const SITE_NAME = siteName || 'Online Store';
@@ -544,9 +551,14 @@ export function CheckoutPayment() {
         setTimeout(() => setIsRedirecting(false), 2000);
       } catch (err: any) {
         setIsRedirecting(false);
-        setPaymentStatus(null);
         sessionStorage.removeItem('meesho_cashfree_session');
-        alert('Cashfree payment could not be started. Please try another payment method.');
+        if (cashfreeOnly) {
+          setPaymentStatus('failed');
+          setPaymentErrorMsg(err?.message || 'Cashfree could not start this payment. Check your Cashfree keys and environment in Vercel.');
+        } else {
+          setPaymentStatus(null);
+          alert('Cashfree payment could not be started. Please try another payment method.');
+        }
       }
       return;
     }
@@ -596,11 +608,17 @@ export function CheckoutPayment() {
   const autoStartedRef = React.useRef(false);
   useEffect(() => {
     if (autoStartedRef.current) return;
-    if (!(location.state as any)?.autoCashfree) return;
-    if (!cashfreeEnabled) return; // wait until /api/config loads
+    if (!cashfreeOnly) return;
+    if (configLoading) return; // wait until /api/config loads
     autoStartedRef.current = true;
+    if (!cashfreeEnabled) {
+      // Never fall back to the payment-methods page: show the error directly.
+      setPaymentStatus('failed');
+      setPaymentErrorMsg('Cashfree is not enabled yet. Add CASHFREE_CLIENT_ID, CASHFREE_SECRET_KEY, CASHFREE_ENABLED=true and CASHFREE_ENVIRONMENT=prod in Vercel, then redeploy.');
+      return;
+    }
     initiatePayment();
-  }, [cashfreeEnabled, location.state]);
+  }, [configLoading, cashfreeEnabled, cashfreeOnly]);
 
   // ── Download QR code as PNG ────────────────────────────────────────────────
   const handleDownloadQR = async () => {
@@ -648,7 +666,62 @@ export function CheckoutPayment() {
     { id: 'cashfree', name: 'Card / Net Banking by Cashfree', desc: 'Debit & credit cards, net banking, wallets — Indian PG', icon: 'https://img.icons8.com/color/96/credit-card.png', secure: true, lucide: undefined },
   ];
 
-  return (
+  return cashfreeOnly ? (
+    <div className="fixed inset-0 z-[300] bg-white flex flex-col font-sans overflow-hidden">
+      <header className="bg-white px-4 h-[60px] flex items-center shadow-sm sticky top-0 z-40 shrink-0 border-b border-gray-100">
+        <button onClick={() => navigate(-1)}
+          className="w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center mr-3 active:scale-95 transition-transform">
+          <ArrowLeft className="w-5 h-5 text-[#02060ce6]" />
+        </button>
+        <div className="flex flex-col">
+          <h1 className="text-[16px] font-extrabold text-[#02060ce6] tracking-tight leading-none">
+            Payment via Cashfree
+          </h1>
+          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mt-0.5">
+            {totalQuantity} item{totalQuantity !== 1 ? 's' : ''} • To Pay: ₹{formatPrice(finalAmount)}
+          </span>
+        </div>
+      </header>
+
+      <div className="flex-1 flex items-center justify-center p-6">
+        {paymentStatus === 'failed' ? (
+          <div className="w-full max-w-[340px] text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <X className="w-8 h-8 text-red-600 stroke-[3]" />
+            </div>
+            <h3 className="text-[18px] font-extrabold text-[#02060ce6] mb-1">Payment Not Started</h3>
+            <p className="text-[13px] font-semibold text-gray-500 leading-relaxed">
+              {paymentErrorMsg || 'Cashfree could not start this payment.'}
+            </p>
+            <button
+              onClick={() => { setPaymentStatus(null); setPaymentErrorMsg(''); setIsRedirecting(true); initiatePayment(); }}
+              className="mt-4 w-full bg-[#9f2089] text-white font-extrabold text-[14px] py-3 rounded-xl hover:bg-[#831871] transition-colors active:scale-95">
+              Try Again
+            </button>
+            <button
+              onClick={() => navigate('/welcome/kurti')}
+              className="mt-2 w-full text-[13px] text-gray-500 font-semibold py-2">Go Back</button>
+          </div>
+        ) : paymentStatus === 'success' ? (
+          <div className="w-full max-w-[340px] text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check className="w-8 h-8 text-green-600 stroke-[3]" />
+            </div>
+            <h3 className="text-[18px] font-extrabold text-[#02060ce6] mb-1">Payment Successful!</h3>
+            <p className="text-[13px] font-bold text-gray-500">Order {pollingOrderId || orderId} confirmed. Thank you!</p>
+          </div>
+        ) : (
+          <div className="w-full max-w-[340px] text-center">
+            <div className="w-14 h-14 border-[3px] border-[#9f2089]/20 border-t-[#9f2089] rounded-full animate-spin mx-auto mb-5" />
+            <h3 className="text-[17px] font-extrabold text-[#02060ce6] mb-1">Connecting to Cashfree…</h3>
+            <p className="text-[13px] font-semibold text-gray-500">
+              Redirecting you to the secure Cashfree payment page.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  ) : (
     <div className="fixed inset-0 z-50 bg-[#f0f2f5] flex flex-col font-sans select-none overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
