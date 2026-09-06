@@ -592,6 +592,16 @@ export function CheckoutPayment() {
     }, 800);
   };
 
+  // ── Auto-open Cashfree checkout when arriving from "Continue" button ──────
+  const autoStartedRef = React.useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (!(location.state as any)?.autoCashfree) return;
+    if (!cashfreeEnabled) return; // wait until /api/config loads
+    autoStartedRef.current = true;
+    initiatePayment();
+  }, [cashfreeEnabled, location.state]);
+
   // ── Download QR code as PNG ────────────────────────────────────────────────
   const handleDownloadQR = async () => {
     try {

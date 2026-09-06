@@ -168,7 +168,8 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
         subtotal: itemsSubtotal,
         volumeDiscountAmount,
         totalQuantity,
-        itemsOriginalTotal
+        itemsOriginalTotal,
+        autoCashfree: true
       } 
     });
   };
