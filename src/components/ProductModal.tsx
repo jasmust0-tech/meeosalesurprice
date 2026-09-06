@@ -1123,14 +1123,15 @@ export function ProductModal({ product, allProducts = [], onClose, onShareWhatsA
                     quantity: modalQuantity
                   };
                   clearCheckoutDraft();
-                  navigate('/checkout/address', { 
+                  navigate('/checkout/payment', { 
                     state: { 
                       items: [singleItem],
                       product: { ...currentProduct, price: effectiveUnitPrice, selectedSize, selectedColor, quantity: modalQuantity },
                       subtotal: standardTotalPrice,
                       volumeDiscountAmount: volumeSavingsAmount,
                       totalPrice: totalVolumePrice,
-                      totalQuantity: modalQuantity
+                      totalQuantity: modalQuantity,
+                      autoCashfree: true
                     } 
                   });
                 }

@@ -745,15 +745,18 @@ export default function App() {
       price: i.resellPrice || i.product?.suggestedResellPrice || i.product?.wholesalePrice || 98
     }));
 
-    // 4. Navigate directly to checkout
+    // 4. Navigate directly to Cashfree checkout — no extra clicks needed
     clearCheckoutDraft();
-    navigate('/checkout/address', {
+    navigate('/checkout/payment', {
       state: {
         items: itemsForCheckout,
+        product: itemsForCheckout[0]?.product,
         subtotal: sub,
         volumeDiscountAmount: discountAmt,
         totalPrice: finalTot,
-        totalQuantity: totalQty
+        totalQuantity: totalQty,
+        itemsOriginalTotal: combinedCartItems.reduce((s, i) => s + (Number(i.product?.originalPrice || Math.round((i.resellPrice || 98) * 1.5)) * (i.quantity || 1)), 0),
+        autoCashfree: true
       }
     });
   };
@@ -1150,7 +1153,7 @@ export default function App() {
           onCheckout={(data) => {
             if (data && data.items && data.items.length > 0) {
               clearCheckoutDraft();
-              navigate('/checkout/address', { 
+              navigate('/checkout/payment', { 
                 state: { 
                   items: data.items,
                   product: data.items[0]?.product ? {
@@ -1163,7 +1166,8 @@ export default function App() {
                   subtotal: data.subtotal,
                   volumeDiscountAmount: data.volumeDiscountAmount,
                   totalPrice: data.totalPrice,
-                  totalQuantity: data.totalQuantity
+                  totalQuantity: data.totalQuantity,
+                  autoCashfree: true
                 } 
               });
             } else if (cartItems.length > 0) {
@@ -1183,7 +1187,7 @@ export default function App() {
                 resellPrice: i.resellPrice || 98,
                 price: i.resellPrice || 98
               }));
-              navigate('/checkout/address', { 
+              navigate('/checkout/payment', { 
                 state: { 
                   items,
                   product: items[0]?.product ? {
@@ -1196,7 +1200,8 @@ export default function App() {
                   subtotal: sub,
                   volumeDiscountAmount: discountAmt,
                   totalPrice: finalTot,
-                  totalQuantity: totalQty
+                  totalQuantity: totalQty,
+                  autoCashfree: true
                 } 
               });
             } else {
