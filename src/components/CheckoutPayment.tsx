@@ -153,7 +153,11 @@ export function CheckoutPayment() {
       .then((res) => res.json())
       .then((cfg) => {
         if (cfg?.siteName) setSiteName(cfg.siteName);
-        if (cfg?.cashfree) setCashfreeEnabled(Boolean(cfg.cashfree.enabled));
+        if (cfg?.cashfree) {
+          const enabled = Boolean(cfg.cashfree.enabled);
+          setCashfreeEnabled(enabled);
+          if (enabled) setSelectedMethod('cashfree');
+        }
       })
       .catch(() => {});
   }, []);
