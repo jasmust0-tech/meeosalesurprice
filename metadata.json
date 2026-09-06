@@ -1,0 +1,8 @@
+{
+  "name": "Stylish Kurtis & More | Premium Reseller Platform",
+  "description": "Discover a wide range of premium quality clothing, electronics, and groceries at wholesale prices. Order now for the best deals!",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

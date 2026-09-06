@@ -1,0 +1,26 @@
+node_modules/
+build/
+
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+.vercel
+__pycache__/
+*.pyc
+paytm_scan_state.json
+paytm_session/
+
+# Build artifacts
+dist/
+UPLOAD_TO_HOSTINGER_PUBLIC_HTML/
+server.cjs
+server.cjs.map
+server.js
+server.js.map
+
+.env
+
+.env.*

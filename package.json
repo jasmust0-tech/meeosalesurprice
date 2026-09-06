@@ -1,0 +1,39 @@
+{
+  "name": "react-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=server.cjs",
+    "postinstall": "npm run build",
+    "start": "node server.cjs",
+    "package-hostinger": "npm run build && rm -rf UPLOAD_TO_HOSTINGER_PUBLIC_HTML && mkdir -p UPLOAD_TO_HOSTINGER_PUBLIC_HTML && cp -r dist/* UPLOAD_TO_HOSTINGER_PUBLIC_HTML/ && cp .htaccess UPLOAD_TO_HOSTINGER_PUBLIC_HTML/",
+    "preview": "vite preview",
+    "clean": "rm -rf dist server.js server.cjs UPLOAD_TO_HOSTINGER_PUBLIC_HTML",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^2.4.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "dotenv": "^17.2.3",
+    "esbuild": "^0.25.0",
+    "express": "^4.21.2",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "react-router-dom": "^7.18.2",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  },
+  "devDependencies": {}
+}
