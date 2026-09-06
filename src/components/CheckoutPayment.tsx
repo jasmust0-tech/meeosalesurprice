@@ -39,6 +39,7 @@ export function CheckoutPayment() {
   const [timeLeft, setTimeLeft] = useState(300);
   const [cashfreeEnabled, setCashfreeEnabled] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
+  const [configFailed, setConfigFailed] = useState(false);
 
   // When the user arrives from the "Continue" button the payment-method list is
   // skipped entirely: we go straight to the Cashfree checkout (or show the
@@ -155,6 +156,13 @@ export function CheckoutPayment() {
   const [siteName, setSiteName] = useState('Online Store');
 
   useEffect(() => {
+    const t = setTimeout(() => {
+      // The config request never settled (slow/cold server, bad network) —
+      // fail open so the customer still reaches Cashfree instead of being
+      // stuck on the payment page forever.
+      setConfigFailed(true);
+      setConfigLoading(false);
+    }, 4000);
     fetch('/api/config')
       .then((res) => res.json())
       .then((cfg) => {
@@ -165,8 +173,11 @@ export function CheckoutPayment() {
           if (enabled) setSelectedMethod('cashfree');
         }
       })
-      .catch(() => {})
-      .finally(() => setConfigLoading(false));
+      .catch(() => setConfigFailed(true))
+      .finally(() => {
+        clearTimeout(t);
+        setConfigLoading(false);
+      });
   }, []);
 
   const SITE_NAME = siteName || 'Online Store';
@@ -543,7 +554,12 @@ export function CheckoutPayment() {
         const mode = data.environment === 'sandbox' ? 'sandbox' : 'production';
         sessionStorage.setItem('meesho_cashfree_env', mode);
         const CashfreeCtor = await loadCashfreeSdk();
-        const cashfree = new CashfreeCtor({ mode });
+        // Cashfree docs call Cashfree({ mode }) as a plain factory (no `new`);
+        // keep a defensive fallback in case the loaded build expects a class.
+        let cashfree = CashfreeCtor({ mode });
+        if (!cashfree || typeof cashfree.checkout !== 'function') {
+          cashfree = new CashfreeCtor({ mode });
+        }
         cashfree.checkout({
           paymentSessionId: data.paymentSessionId,
           redirectTarget: '_self',
@@ -614,7 +630,9 @@ export function CheckoutPayment() {
     if (autoStartedRef.current) return;
     if (configLoading) return; // wait until /api/config loads
     autoStartedRef.current = true;
-    if (!cashfreeEnabled) {
+    // Cashfree is enabled, or the config could not be read (fail open): the
+    // server validates the keys itself, so attempt the checkout either way.
+    if (!cashfreeEnabled && !configFailed) {
       // Cashfree off: on the Cashfree-only screen show a clear error; on the
       // full payment page fall back to the normal methods list.
       if (cashfreeOnly) {
@@ -624,7 +642,7 @@ export function CheckoutPayment() {
       return;
     }
     initiatePayment();
-  }, [configLoading, cashfreeEnabled, cashfreeOnly]);
+  }, [configLoading, cashfreeEnabled, cashfreeOnly, configFailed]);
 
   // ── Download QR code as PNG ────────────────────────────────────────────────
   const handleDownloadQR = async () => {
