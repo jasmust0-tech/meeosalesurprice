@@ -24,3 +24,6 @@ server.js.map
 .env
 
 .env.*
+
+APIKey.csv
+*.csv
