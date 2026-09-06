@@ -3,16 +3,6 @@ export interface UpiConfig {
   notePrefix: string;
 }
 
-export interface FirebaseConfigData {
-  apiKey: string;
-  projectId: string;
-  appId: string;
-  authDomain: string;
-  firestoreDatabaseId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-}
-
 export interface CashfreeConfig {
   enabled: boolean;
   environment: 'sandbox' | 'prod';
@@ -23,7 +13,6 @@ export interface CashfreeConfig {
 export interface AppSettings {
   siteName: string;
   upi: UpiConfig;
-  firebase: FirebaseConfigData;
   pixels: string[];
   gaCodes: string[];
   cashfree?: CashfreeConfig;

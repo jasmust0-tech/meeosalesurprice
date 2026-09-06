@@ -27,3 +27,7 @@ server.js.map
 
 APIKey.csv
 *.csv
+
+# Runtime-persisted local data (contains secrets / order data)
+data/settings.json
+data/orders.json

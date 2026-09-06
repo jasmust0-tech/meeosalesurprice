@@ -8,10 +8,6 @@ import {
 const defaultSettings: AppSettings = {
   siteName: '',
   upi: { address: '', notePrefix: 'Order Payment' },
-  firebase: {
-    apiKey: '', projectId: '', appId: '', authDomain: '',
-    firestoreDatabaseId: '(default)', storageBucket: '', messagingSenderId: '',
-  },
   pixels: [],
   gaCodes: [],
   cashfree: { enabled: false, environment: 'sandbox', clientId: '', secretKey: '' },
@@ -60,7 +56,6 @@ export function AdminCashfree() {
         setSettings({
           ...defaultSettings,
           ...s,
-          firebase: { ...defaultSettings.firebase, ...s.firebase },
           upi: { ...defaultSettings.upi, ...s.upi },
           cashfree: { ...defaultSettings.cashfree, ...(s.cashfree || {}) },
         });

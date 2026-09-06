@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { clearAuth, getUsername } from './adminApi';
 import {
-  LayoutDashboard, Settings, Fingerprint, ShoppingBag, Users, KeyRound,
+  LayoutDashboard, Settings, ShoppingBag, Users, KeyRound,
   LogOut, Menu, X, Store, CreditCard,
 } from 'lucide-react';
 
@@ -10,7 +10,6 @@ const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/admin/users', label: 'Users', icon: Users },
-  { to: '/admin/firebase', label: 'Firebase Config', icon: Fingerprint },
   { to: '/admin/cashfree', label: 'Cashfree Payments', icon: CreditCard },
   { to: '/admin/tracking', label: 'UPI, Pixel & Analytics', icon: Settings },
   { to: '/admin/password', label: 'Change Password', icon: KeyRound },

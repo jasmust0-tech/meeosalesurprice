@@ -1,6 +1,4 @@
 import "dotenv/config";
-import { initializeApp, getApps, getApp, deleteApp } from "firebase/app";
-import { getFirestore, collection, getDocs, doc, setDoc, getDoc } from "firebase/firestore";
 import fs from "fs";
 import path from "path";
 import express from "express";
@@ -16,88 +14,6 @@ app.use(express.json({
     if (buf && buf.length) req.rawBody = buf.toString("utf8");
   },
 }));
-
-// Wrap a Firestore promise so a broken/unreachable database never hangs a request.
-function withTimeout<T>(p: Promise<T>, ms = 4000): Promise<T | null> {
-  return new Promise((resolve) => {
-    const t = setTimeout(() => resolve(null), ms);
-    p.then((v) => { clearTimeout(t); resolve(v); })
-     .catch((e) => { clearTimeout(t); console.warn("Firestore op error:", e?.message || e); resolve(null); });
-  });
-}
-
-// Optional Firestore database for persistent orders & payments
-let db: any = null;
-
-function resolveFirebaseConfig(): any | null {
-  let config: any = null;
-  if (process.env.FIREBASE_CONFIG) {
-    try {
-      config = JSON.parse(process.env.FIREBASE_CONFIG.trim());
-      return config;
-    } catch {}
-  }
-  if (process.env.FIREBASE_API_KEY || process.env.API_KEY) {
-    config = {
-      projectId: process.env.FIREBASE_PROJECT_ID || process.env.PROJECT_ID || "gen-lang-client-0276736297",
-      apiKey: process.env.FIREBASE_API_KEY || process.env.API_KEY,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || `${process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0276736297"}.firebaseapp.com`,
-      firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || "(default)",
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0276736297"}.firebasestorage.app`,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "631450863637",
-      appId: process.env.FIREBASE_APP_ID || "1:631450863637:web:7aedfca8dfe14538e0661c"
-    };
-    return config;
-  }
-  const localPaths = [
-    path.resolve(process.cwd(), "firebase-applet-config.json"),
-    path.resolve(__dirname, "firebase-applet-config.json"),
-    path.resolve(__dirname, "..", "firebase-applet-config.json"),
-  ];
-  for (const p of localPaths) {
-    if (fs.existsSync(p)) {
-      try {
-        config = JSON.parse(fs.readFileSync(p, "utf-8"));
-        return config;
-      } catch {}
-    }
-  }
-  return null;
-}
-
-// Connect (or reconnect) Firestore using the currently active settings.
-function connectFirestore(cfg: any): any {
-  try {
-    if (!cfg) return null;
-    // Tear down existing app so a config change actually takes effect.
-    getApps().forEach((a) => { try { deleteApp(a as any); } catch {} });
-    const fbApp = initializeApp(cfg);
-    const id = cfg.firestoreDatabaseId || "(default)";
-    const firestore = getFirestore(fbApp, id);
-    console.log("Firestore connected:", cfg.projectId, "/", id);
-    return firestore;
-  } catch (err) {
-    console.log("Running in standalone in-memory mode for Orders");
-    return null;
-  }
-}
-
-function initDbFromSettings() {
-  const stored = settingsStore?.firebase;
-  if (stored && stored.apiKey) {
-    db = connectFirestore({
-      apiKey: stored.apiKey,
-      projectId: stored.projectId,
-      appId: stored.appId,
-      authDomain: stored.authDomain,
-      firestoreDatabaseId: stored.firestoreDatabaseId || "(default)",
-      storageBucket: stored.storageBucket,
-      messagingSenderId: stored.messagingSenderId,
-    });
-  } else {
-    db = connectFirestore(resolveFirebaseConfig());
-  }
-}
 
 // In-memory product & category store loaded from data/database.json
 function loadInitialData() {
@@ -129,10 +45,10 @@ let cartStore: any[] = [];
 let ordersStore: any[] = [];
 
 // ============================================================================
-// Orders local file persistence (fallback cache)
-// Orders are also stored in Firestore, but a local JSON cache keeps the data
-// available across server restarts / cold-starts even if the database is
-// temporarily unreachable, so the admin panel never shows empty data.
+// Orders local file persistence
+// Orders are stored in a local JSON cache so the data survives server restarts
+// / cold-starts where a persistent filesystem is available (e.g. Hostinger
+// Node hosting). On serverless platforms the cache is kept in memory.
 // ============================================================================
 const ORDERS_FILE = path.resolve(process.cwd(), "data", "orders.json");
 
@@ -234,35 +150,16 @@ export interface CashfreeConfig {
   secretKey: string;
 }
 
-// Default admin settings (used when nothing is stored in Firestore yet).
+// Default admin settings.
 export interface AppSettings {
   admin: { username: string; passwordHash: string; passwordSalt: string };
   siteName: string;
   upi: { address: string; notePrefix: string };
-  firebase: {
-    apiKey: string;
-    projectId: string;
-    appId: string;
-    authDomain: string;
-    firestoreDatabaseId: string;
-    storageBucket: string;
-    messagingSenderId: string;
-  };
   pixels: string[];   // Meta Pixel IDs (can be multiple)
   gaCodes: string[];  // Google Analytics Measurement IDs
   tokenSecret: string; // stable HMAC secret for admin auth (persisted)
   cashfree: CashfreeConfig; // Cashfree payment gateway keys
 }
-
-const getEnvFirebase = () => ({
-  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyA2WI7J7ixf6KeeZmfYjXuiamLzAtf9Q98",
-  projectId: process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0276736297",
-  appId: process.env.FIREBASE_APP_ID || "1:631450863637:web:7aedfca8dfe14538e0661c",
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "gen-lang-client-0276736297.firebaseapp.com",
-  firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || "(default)",
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "gen-lang-client-0276736297.firebasestorage.app",
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "631450863637",
-});
 
 function hashPassword(password: string, salt: string): string {
   return crypto.scryptSync(password, salt, 64).toString("hex");
@@ -272,7 +169,7 @@ function defaultSettings(): AppSettings {
   const defaultPass = process.env.ADMIN_PASSWORD || "admin123";
   const defaultUser = process.env.ADMIN_USERNAME || "admin";
   // Deterministic defaults so auth stays stable across serverless cold-starts
-  // even when Firestore / filesystem persistence is unavailable. Change the
+  // even when filesystem persistence is unavailable. Change the
   // password in the admin panel (or set env vars) for real persistence/security.
   const salt = process.env.ADMIN_SALT || "meesho-admin-salt-v1-fixed";
   const tokenSecret = process.env.ADMIN_TOKEN_SECRET_OVERRIDE || "meesho-admin-token-secret-v1-9f3b1c7d2e4a6b8c";
@@ -280,7 +177,6 @@ function defaultSettings(): AppSettings {
     admin: { username: defaultUser, passwordHash: hashPassword(defaultPass, salt), passwordSalt: salt },
     siteName: "Online Store",
     upi: { address: "paytm.s31xj2l@pty", notePrefix: "Order Payment" },
-    firebase: getEnvFirebase(),
     pixels: ["1066282156112556"],
     gaCodes: ["G-Z1E4R7P9TJ"],
     tokenSecret,
@@ -294,48 +190,9 @@ function defaultSettings(): AppSettings {
 }
 
 let settingsStore: AppSettings = defaultSettings();
-const SETTINGS_DOC = "app";
 
-// Load settings from Firestore (if available) or from local settings.json cache.
-async function loadSettingsFromDb() {
-  if (!db) return;
-  try {
-    const snap: any = await withTimeout(getDoc(doc(db, "settings", SETTINGS_DOC)) as any, 5000);
-    if (snap && snap.exists()) {
-      const data = snap.data() as any;
-      // Merge so newly added fields always default correctly.
-      const base = defaultSettings();
-      if (data.admin?.username && data.admin?.passwordHash) {
-        base.admin = { ...base.admin, ...data.admin };
-      }
-      if (data.firebase) base.firebase = { ...base.firebase, ...data.firebase };
-      if (data.upi) base.upi = { ...base.upi, ...data.upi };
-      if (data.siteName) base.siteName = data.siteName;
-      if (Array.isArray(data.pixels)) base.pixels = data.pixels;
-      if (Array.isArray(data.gaCodes)) base.gaCodes = data.gaCodes;
-      if (data.tokenSecret) base.tokenSecret = data.tokenSecret;
-      if (data.cashfree) base.cashfree = { ...base.cashfree, ...data.cashfree };
-      settingsStore = base;
-      console.log("Admin settings loaded from Firestore");
-    } else {
-      await withTimeout(setDoc(doc(db, "settings", SETTINGS_DOC), settingsStore as any) as any);
-      console.log("Seeded admin settings into Firestore");
-    }
-  } catch (e) {
-    console.warn("Could not load settings from Firestore:", e);
-  }
-}
-
-// Persist settings to Firestore (silent failure -> in-memory only fallback).
+// Persist settings to the local cache so standalone mode survives restarts.
 async function persistSettings() {
-  if (db) {
-    try {
-      await withTimeout(setDoc(doc(db, "settings", SETTINGS_DOC), settingsStore as any) as any);
-    } catch (e) {
-      console.warn("Persist settings error:", e);
-    }
-  }
-  // Also cache locally so standalone mode survives restarts.
   try {
     fs.mkdirSync(path.resolve(process.cwd(), "data"), { recursive: true });
     fs.writeFileSync(
@@ -352,7 +209,6 @@ function loadSettingsFromFile() {
       const data = JSON.parse(fs.readFileSync(p, "utf-8"));
       const base = defaultSettings();
       if (data.admin?.username && data.admin?.passwordHash) base.admin = { ...base.admin, ...data.admin };
-      if (data.firebase) base.firebase = { ...base.firebase, ...data.firebase };
       if (data.upi) base.upi = { ...base.upi, ...data.upi };
       if (data.siteName) base.siteName = data.siteName;
       if (Array.isArray(data.pixels)) base.pixels = data.pixels;
@@ -365,9 +221,9 @@ function loadSettingsFromFile() {
 }
 
 // Environment variables are authoritative for Cashfree: when CASHFREE_CLIENT_ID
-// or CASHFREE_SECRET_KEY are set, they override any stored (Firestore / local)
+// or CASHFREE_SECRET_KEY are set, they override any stored local
 // cashfree settings. This guarantees keys set in Vercel always take effect even
-// if an older, empty cashfree config was persisted to the database.
+// if an older, empty cashfree config was persisted to the settings file.
 function applyEnvCashfree() {
   const hasEnv = process.env.CASHFREE_CLIENT_ID || process.env.CASHFREE_SECRET_KEY;
   if (!hasEnv) return;
@@ -468,15 +324,6 @@ app.get("/api/admin/settings", authMiddleware, (req, res) => {
   res.json({
     siteName: s.siteName,
     upi: s.upi,
-    firebase: {
-      apiKey: s.firebase.apiKey,
-      projectId: s.firebase.projectId,
-      appId: s.firebase.appId,
-      authDomain: s.firebase.authDomain,
-      firestoreDatabaseId: s.firebase.firestoreDatabaseId,
-      storageBucket: s.firebase.storageBucket,
-      messagingSenderId: s.firebase.messagingSenderId,
-    },
     pixels: s.pixels,
     gaCodes: s.gaCodes,
     cashfree: s.cashfree
@@ -495,7 +342,6 @@ app.post("/api/admin/settings", authMiddleware, async (req, res) => {
   try {
     if (b.siteName) settingsStore.siteName = String(b.siteName).slice(0, 60);
     if (b.upi) settingsStore.upi = { ...settingsStore.upi, ...b.upi };
-    if (b.firebase) settingsStore.firebase = { ...settingsStore.firebase, ...b.firebase, firestoreDatabaseId: (b.firebase.firestoreDatabaseId || "(default)") };
     if (Array.isArray(b.pixels)) settingsStore.pixels = b.pixels.map(String).filter(Boolean);
     if (Array.isArray(b.gaCodes)) settingsStore.gaCodes = b.gaCodes.map(String).filter(Boolean);
     if (b.cashfree) {
@@ -507,14 +353,10 @@ app.post("/api/admin/settings", authMiddleware, async (req, res) => {
       };
     }
     await persistSettings();
-    // If Firebase credentials changed, reconnect immediately so orders read/write
-    // against the new database.
-    try { db = connectFirestore(settingsStore.firebase); } catch {}
     invalidateOrdersCache();
     res.json({ success: true, settings: {
       siteName: settingsStore.siteName,
       upi: settingsStore.upi,
-      firebase: settingsStore.firebase,
       pixels: settingsStore.pixels,
       gaCodes: settingsStore.gaCodes,
       cashfree: settingsStore.cashfree,
@@ -546,9 +388,9 @@ app.post("/api/admin/change-password", authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
-// Cache Firestore reads with a short TTL so the admin pages that auto-poll
-// every few seconds do not hammer the database with a full collection read
-// each time. The cache is invalidated whenever an order is written.
+// Cache order reads with a short TTL so the admin pages that auto-poll
+// every few seconds do not re-read the store each time. The cache is
+// invalidated whenever an order is written.
 const ORDERS_CACHE_TTL_MS = 4000;
 let ordersCache: any[] | null = null;
 let ordersCacheAt = 0;
@@ -592,29 +434,10 @@ app.get("/api/admin/orders/stream", authMiddleware, (req, res) => {
   req.on("close", () => adminClients.delete(res));
 });
 
-// --- Admin orders: realtime aggregate from Firestore with product details ---
+// --- Admin orders: realtime aggregate from the in-memory/file order store ---
 async function readOrders(force = false): Promise<any[]> {
   if (!force && ordersCache && Date.now() - ordersCacheAt < ORDERS_CACHE_TTL_MS) {
     return ordersCache;
-  }
-  let fromDb: any[] | null = null;
-  if (db) {
-    try {
-      const snap: any = await withTimeout(getDocs(collection(db, "orders")) as any);
-      if (snap && !snap.empty) {
-        fromDb = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-      }
-    } catch (e) {
-      console.warn("Firestore read orders error:", e);
-    }
-  }
-  // Prefer the source that has data so the panel never shows empty after a
-  // cold-start or temporary database failure. Keep both copies consistent.
-  if (fromDb && fromDb.length >= ordersStore.length) {
-    ordersCache = fromDb;
-    ordersCacheAt = Date.now();
-    ordersStore = fromDb;
-    return fromDb;
   }
   ordersCache = [...ordersStore];
   ordersCacheAt = Date.now();
@@ -646,10 +469,6 @@ app.post("/api/admin/orders/:id/status", authMiddleware, async (req, res) => {
   invalidateOrdersCache();
   try {
     let updated = false;
-    if (db) {
-      const result: any = await withTimeout(setDoc(doc(db, "orders", req.params.id), { status }, { merge: true }) as any);
-      if (result !== null) updated = true;
-    }
     const idx = ordersStore.findIndex((o: any) => o.id === req.params.id);
     if (idx !== -1) {
       ordersStore[idx].status = status;
@@ -803,21 +622,7 @@ app.post("/api/admin/hard-reset", authMiddleware, async (req, res) => {
       return res.status(401).json({ error: "Incorrect password" });
     }
 
-    // 1. Clear all orders from Firestore.
-    if (db) {
-      try {
-        const snap: any = await withTimeout(getDocs(collection(db, "orders")) as any);
-        if (snap && !snap.empty) {
-          for (const d of snap.docs) {
-            await withTimeout(setDoc(doc(db, "orders", d.id), { deleted: true, deletedAt: new Date().toISOString() }) as any);
-          }
-        }
-      } catch (e) {
-        console.warn("Hard reset Firestore orders error:", e);
-      }
-    }
-
-    // 2. Clear in-memory orders store.
+    // 1. Clear in-memory orders store.
     ordersStore = [];
     invalidateOrdersCache();
 
@@ -841,17 +646,6 @@ app.post("/api/admin/hard-reset", authMiddleware, async (req, res) => {
     res.status(500).json({ error: "Failed to reset data" });
   }
 });
-
-// Ensure settings are loaded from db once initialized
-loadSettingsFromDb().then(() => {
-  // Env vars win over whatever the database restored.
-  applyEnvCashfree();
-  // Reconnect against whatever firebase config got loaded (env / file / db).
-  initDbFromSettings();
-});
-
-// Boot-time connection (env / file based) used before the db load resolves.
-initDbFromSettings();
 
 
 // 1. Categories
@@ -1056,16 +850,6 @@ app.delete("/api/cart/:id", (req, res) => {
 
 // 4. Orders
 app.get("/api/orders", async (req, res) => {
-  if (db) {
-    try {
-      const snap: any = await withTimeout(getDocs(collection(db, "orders")) as any);
-      if (snap && !snap.empty) {
-        return res.json(snap.docs.map(d => d.data()));
-      }
-    } catch (e) {
-      console.warn("Firestore get orders error:", e);
-    }
-  }
   res.json(ordersStore);
 });
 
@@ -1108,12 +892,7 @@ app.post("/api/orders", async (req, res) => {
     cartStore = [];
     invalidateOrdersCache();
 
-    // Persist to Firestore + local cache so the order survives restarts /
-    // cold-starts even if the database is temporarily unavailable.
-    if (db) {
-      const orderRef = doc(db, "orders", orderId);
-      withTimeout(setDoc(orderRef, order) as any);
-    }
+    // Persist to the local cache so the order survives restarts / cold-starts.
     persistOrdersToFile();
 
     broadcastOrdersChanged({ type: "created", order });
@@ -1128,26 +907,6 @@ app.post("/api/orders/verify", async (req, res) => {
     const { orderId, amount, status } = req.body;
     let order: any = null;
     invalidateOrdersCache();
-
-    if (db) {
-      try {
-        const orderRef = doc(db, "orders", orderId);
-        const d: any = await withTimeout(getDoc(orderRef) as any);
-        if (d && d.exists()) {
-          order = d.data();
-          if (status === 'Paid') {
-            order.status = 'Paid';
-            order.paymentAmount = amount;
-            order.paymentDate = new Date().toISOString();
-          } else {
-            order.status = status;
-          }
-          await withTimeout(setDoc(orderRef, order) as any);
-        }
-      } catch (e) {
-        console.warn("Firestore verify order error:", e);
-      }
-    }
 
     if (!order) {
       order = ordersStore.find(o => o.id === orderId);
@@ -1223,16 +982,11 @@ async function cashfreeRequest<T = any>(path: string, method = "GET", body?: any
   return { ok: res.ok, status: res.status, data };
 }
 
-// Apply a payment update to an order across Firestore, the local store, the
+// Apply a payment update to an order in the local store, the
 // local JSON cache and live admin clients (single source of truth).
 function updateOrderFields(orderId: string, patch: Record<string, any>) {
   invalidateOrdersCache();
   let order: any = null;
-  if (db) {
-    try {
-      withTimeout(setDoc(doc(db, "orders", orderId), patch, { merge: true }) as any);
-    } catch {}
-  }
   const idx = ordersStore.findIndex((o: any) => o.id === orderId);
   if (idx !== -1) {
     ordersStore[idx] = { ...ordersStore[idx], ...patch };
@@ -1407,13 +1161,7 @@ app.post("/api/payments/cashfree/webhook", async (req, res) => {
 app.get("/api/orders/:id/status", async (req, res) => {
   try {
     let order: any = null;
-    if (db) {
-      try {
-        const d: any = await withTimeout(getDoc(doc(db, "orders", req.params.id)) as any);
-        if (d && d.exists()) order = d.data();
-      } catch (e) {}
-    }
-    if (!order) order = ordersStore.find(o => o.id === req.params.id);
+    order = ordersStore.find(o => o.id === req.params.id);
     if (order) {
       return res.json({
         status: order.status,

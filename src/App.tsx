@@ -25,7 +25,6 @@ import {
   AdminDashboard,
   AdminOrders,
   AdminUsers,
-  AdminFirebaseConfig,
   AdminCashfree,
   AdminTracking,
   AdminChangePassword,
@@ -1113,13 +1112,6 @@ export default function App() {
             <RequireAdmin>
               <AdminLayout>
                 <AdminUsers />
-              </AdminLayout>
-            </RequireAdmin>
-          } />
-          <Route path="/admin/firebase" element={
-            <RequireAdmin>
-              <AdminLayout>
-                <AdminFirebaseConfig />
               </AdminLayout>
             </RequireAdmin>
           } />

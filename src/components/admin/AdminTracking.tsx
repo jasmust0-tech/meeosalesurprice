@@ -8,10 +8,6 @@ import {
 const defaultSettings: AppSettings = {
   siteName: '',
   upi: { address: '', notePrefix: 'Order Payment' },
-  firebase: {
-    apiKey: '', projectId: '', appId: '', authDomain: '',
-    firestoreDatabaseId: '(default)', storageBucket: '', messagingSenderId: '',
-  },
   pixels: [],
   gaCodes: [],
 };
@@ -32,7 +28,6 @@ export function AdminTracking() {
         setSettings({
           ...defaultSettings,
           ...s,
-          firebase: { ...defaultSettings.firebase, ...s.firebase },
           upi: { ...defaultSettings.upi, ...s.upi },
         });
       })
