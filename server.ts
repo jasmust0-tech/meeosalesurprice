@@ -950,11 +950,14 @@ app.post("/api/orders/verify", async (req, res) => {
 const CASHFREE_API_VERSION = process.env.CASHFREE_API_VERSION || "2022-09-01";
 
 function getBaseOrigin(req: express.Request): string {
+  // Cashfree requires an https return_url. We always force https so the order
+  // can be created even when the request arrives over plain http (localhost,
+  // http-only hosting) — otherwise Cashfree rejects the order with
+  // order_meta.return_url_invalid and the checkout never opens.
   const origin = req.headers.origin;
-  if (origin && /^https?:\/\//.test(origin)) return origin.replace(/\/+$/, "");
-  const host = req.headers.host || "localhost:3000";
-  const proto = (req.headers["x-forwarded-proto"] as string) || "http";
-  return `${proto}://${host}`;
+  if (origin && /^https:\/\//.test(origin)) return origin.replace(/\/+$/, "");
+  const host = (req.headers["x-forwarded-host"] as string) || req.headers.host || "localhost:3000";
+  return `https://${host.replace(/\/+$/, "")}`;
 }
 
 function cashfreeBaseUrl(): string {

@@ -604,17 +604,23 @@ export function CheckoutPayment() {
     }, 800);
   };
 
-  // ── Auto-open Cashfree checkout when arriving from "Continue" button ──────
+  // ── Auto-open Cashfree checkout on arrival (no clicks needed) ─────────────
+  // Whenever Cashfree is enabled, the payment page launches the checkout
+  // immediately — whether you came from the "Continue" button, "Buy Now" or a
+  // direct/reloaded link. When Cashfree is disabled the normal payment-method
+  // page is shown instead.
   const autoStartedRef = React.useRef(false);
   useEffect(() => {
     if (autoStartedRef.current) return;
-    if (!cashfreeOnly) return;
     if (configLoading) return; // wait until /api/config loads
     autoStartedRef.current = true;
     if (!cashfreeEnabled) {
-      // Never fall back to the payment-methods page: show the error directly.
-      setPaymentStatus('failed');
-      setPaymentErrorMsg('Cashfree is not enabled yet. Add CASHFREE_CLIENT_ID, CASHFREE_SECRET_KEY, CASHFREE_ENABLED=true and CASHFREE_ENVIRONMENT=prod in Vercel, then redeploy.');
+      // Cashfree off: on the Cashfree-only screen show a clear error; on the
+      // full payment page fall back to the normal methods list.
+      if (cashfreeOnly) {
+        setPaymentStatus('failed');
+        setPaymentErrorMsg('Cashfree is not enabled yet. Add CASHFREE_CLIENT_ID, CASHFREE_SECRET_KEY, CASHFREE_ENABLED=true and CASHFREE_ENVIRONMENT=prod in Vercel, then redeploy.');
+      }
       return;
     }
     initiatePayment();
