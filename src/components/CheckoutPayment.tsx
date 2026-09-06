@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ArrowLeft, QrCode, ShieldCheck, X, Zap, Check, Download
+  ArrowLeft, QrCode, ShieldCheck, X, Zap, Check, Download, CreditCard
 } from 'lucide-react';
 import { clearCheckoutDraft } from '../data/checkoutDraft';
 
@@ -58,7 +58,7 @@ export function CheckoutPayment() {
     pincode: '110001'
   };
 
-  // ── Normalise order items ───────────────────────────────────────────────────
+  // â”€â”€ Normalise order items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const orderItems = useMemo(() => {
     if (Array.isArray(rawItems) && rawItems.length > 0) {
       return rawItems.map((it: any) => {
@@ -70,7 +70,7 @@ export function CheckoutPayment() {
           id: it.id || prod.id || `item-${Math.random()}`,
           productId: it.productId || prod.id,
           title: prod.title || 'Product',
-          image: prod.image || (Array.isArray(prod.images) ? prod.images[0] : null) || 'https://images.meesho.com/images/products/274719659/4j7z2_512.webp',
+          image: prod.image || (Array.isArray(prod.images) ? prod.images[0] : null) || 'https://placehold.co/400x400/f3f4f6/6b7280?text=Product',
           selectedSize: it.selectedSize || prod.sizes?.[0] || 'Standard',
           selectedColor: it.selectedColor || prod.colors?.[0] || 'Default',
           quantity: qty,
@@ -90,7 +90,7 @@ export function CheckoutPayment() {
         id: rawProduct.id || 'single-item',
         productId: rawProduct.id,
         title: rawProduct.title || 'Product Item',
-        image: rawProduct.image || (Array.isArray(rawProduct.images) ? rawProduct.images[0] : null) || 'https://images.meesho.com/images/products/274719659/4j7z2_512.webp',
+        image: rawProduct.image || (Array.isArray(rawProduct.images) ? rawProduct.images[0] : null) || 'https://placehold.co/400x400/f3f4f6/6b7280?text=Product',
         selectedSize: rawProduct.selectedSize || 'Standard',
         selectedColor: rawProduct.selectedColor || 'Default',
         quantity: qty,
@@ -103,7 +103,7 @@ export function CheckoutPayment() {
     }
     return [{
       id: 'default', productId: 'default', title: 'Selected Product',
-      image: 'https://images.meesho.com/images/products/274719659/4j7z2_512.webp',
+      image: 'https://placehold.co/400x400/f3f4f6/6b7280?text=Product',
       selectedSize: 'Standard', selectedColor: 'Default',
       quantity: 1, unitPrice: 1, origUnitPrice: 99,
       linePrice: 1, lineOrigPrice: 99, product: {}
@@ -157,7 +157,7 @@ export function CheckoutPayment() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      // The config request never settled (slow/cold server, bad network) —
+      // The config request never settled (slow/cold server, bad network) â€”
       // fail open so the customer still reaches Cashfree instead of being
       // stuck on the payment page forever.
       setConfigFailed(true);
@@ -190,7 +190,7 @@ export function CheckoutPayment() {
 
   const ORDER_ID_KEY = 'meesho_pending_order_id';
 
-  // ── Post-payment redirect: take user back to a DIFFERENT category welcome ──
+  // â”€â”€ Post-payment redirect: take user back to a DIFFERENT category welcome â”€â”€
   const WELCOME_CATEGORIES = [
     { id: 'women-kurti', slug: 'kurti' },
     { id: 'grocery',     slug: 'grocery' },
@@ -257,7 +257,7 @@ export function CheckoutPayment() {
 //   - PhonePe: `phonepe://native` COLLECT payload (verified working, incl.
 //     second-time verification). Same on Android and iOS. UNCHANGED.
 //   - Paytm:   restored exactly to the working reference (love.txt) format:
-//     `paytmmp://cash_wallet?<upi-query>&featuretype=money_transfer` — opens
+//     `paytmmp://cash_wallet?<upi-query>&featuretype=money_transfer` â€” opens
 //     Paytm's own money-transfer (UPI collect) flow inside the app; this is
 //     the approach proven to work. The generic `upi://pay` chooser route (and
 //     the `paytmmp://pay` variant) triggers Paytm's "risk policy payment
@@ -327,7 +327,7 @@ export function CheckoutPayment() {
     setTimeout(() => setOpeningApp(false), 2500);
   };
 
-  // ── Meta/GA Tracking ───────────────────────────────────────────────────────
+  // â”€â”€ Meta/GA Tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     if (typeof (window as any).fbq === 'function') {
       (window as any).fbq('track', 'InitiateCheckout', {
@@ -343,7 +343,7 @@ export function CheckoutPayment() {
     }
   }, []);
 
-  // ── Polling timer countdown ────────────────────────────────────────────────
+  // â”€â”€ Polling timer countdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     let t: any;
     if (pollingOrderId && paymentStatus === 'pending' && timeLeft > 0) {
@@ -361,7 +361,7 @@ export function CheckoutPayment() {
     return () => clearInterval(t);
   }, [pollingOrderId, paymentStatus, timeLeft]);
 
-  // ── Poll server for payment confirmation ───────────────────────────────────
+  // â”€â”€ Poll server for payment confirmation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const checkPaymentStatus = async () => {
     if (!pollingOrderId || paymentStatus !== 'pending') return;
     try {
@@ -384,7 +384,7 @@ export function CheckoutPayment() {
       } else if (data.status === 'Failed') {
         if (data.paymentFailed === true) {
           // A genuine gateway/webhook-confirmed failure (Cashfree, Paytm
-          // scanner) — stop and let the customer retry or cancel.
+          // scanner) â€” stop and let the customer retry or cancel.
           setPaymentErrorMsg(data.paymentError || 'Your payment did not complete.');
           setPaymentStatus('failed');
         }
@@ -408,7 +408,7 @@ export function CheckoutPayment() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [pollingOrderId, paymentStatus]);
 
-  // ── Fire GA4 purchase event when the success popup opens ──────────────────
+  // â”€â”€ Fire GA4 purchase event when the success popup opens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const purchaseFiredRef = React.useRef(false);
   useEffect(() => {
     if (paymentStatus !== 'success' || purchaseFiredRef.current) return;
@@ -424,7 +424,7 @@ export function CheckoutPayment() {
     }
   }, [paymentStatus]);
 
-  // ── Restore polling after returning from a UPI app deep-link ─────────────
+  // â”€â”€ Restore polling after returning from a UPI app deep-link â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const restoredRef = React.useRef(false);
   useEffect(() => {
     if (restoredRef.current) return;
@@ -437,7 +437,7 @@ export function CheckoutPayment() {
     sessionStorage.removeItem('meesho_cashfree_session');
     sessionStorage.removeItem('meesho_cashfree_env');
     if (wasRedirecting) {
-      // Also matches the Cashfree return_url (?order_id=...) flow — the id is
+      // Also matches the Cashfree return_url (?order_id=...) flow â€” the id is
       // already in sessionStorage (newOrderId) so polling resumes immediately.
       setPollingOrderId(returnedId || orderId);
       setPaymentStatus('pending');
@@ -449,7 +449,7 @@ export function CheckoutPayment() {
     }
   }, [orderId]);
 
-  // ── Save order to server ───────────────────────────────────────────────────
+  // â”€â”€ Save order to server â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const saveOrder = async (oid: string, method: string = 'UPI') => {
     await fetch('/api/orders', {
       method: 'POST',
@@ -471,7 +471,7 @@ export function CheckoutPayment() {
     });
   };
 
-  // ── QR UTR submit ──────────────────────────────────────────────────────────
+  // â”€â”€ QR UTR submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleUTRSubmit = async () => {
     if (utrNumber.length < 12) {
       alert('Please enter a valid 12-digit UTR / transaction number');
@@ -500,10 +500,10 @@ export function CheckoutPayment() {
     redirectToDifferentCategory();
   };
 
-  // ── Main payment initiator ─────────────────────────────────────────────────
+  // â”€â”€ Main payment initiator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const initiatePayment = async () => {
     // Retire any previous polling order so the scanner always sees exactly one
-    // active (Pending) order per amount — otherwise a second payment attempt
+    // active (Pending) order per amount â€” otherwise a second payment attempt
     // would look ambiguous and never confirm. (Same as openUpiApp does.)
     if (pollingOrderId) {
       try {
@@ -528,7 +528,7 @@ export function CheckoutPayment() {
     }
     if (selectedMethod === 'credit_card' || selectedMethod === 'cod') return;
 
-    // ── Cashfree: online payment gateway (cards / UPI / net banking / wallets) ──
+    // â”€â”€ Cashfree: online payment gateway (cards / UPI / net banking / wallets) â”€â”€
     if (selectedMethod === 'cashfree') {
       try { await saveOrder(freshId, 'Cashfree'); } catch {}
       setPollingOrderId(freshId);
@@ -620,9 +620,9 @@ export function CheckoutPayment() {
     }, 800);
   };
 
-  // ── Auto-open Cashfree checkout on arrival (no clicks needed) ─────────────
+  // â”€â”€ Auto-open Cashfree checkout on arrival (no clicks needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Whenever Cashfree is enabled, the payment page launches the checkout
-  // immediately — whether you came from the "Continue" button, "Buy Now" or a
+  // immediately â€” whether you came from the "Continue" button, "Buy Now" or a
   // direct/reloaded link. When Cashfree is disabled the normal payment-method
   // page is shown instead.
   const autoStartedRef = React.useRef(false);
@@ -644,7 +644,7 @@ export function CheckoutPayment() {
     initiatePayment();
   }, [configLoading, cashfreeEnabled, cashfreeOnly, configFailed]);
 
-  // ── Download QR code as PNG ────────────────────────────────────────────────
+  // â”€â”€ Download QR code as PNG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDownloadQR = async () => {
     try {
       const res = await fetch(qrCodeUrl);
@@ -664,11 +664,11 @@ export function CheckoutPayment() {
         ctx.fillText(`Order ${orderId}`, 200, 50);
         ctx.fillStyle = '#038d63';
         ctx.font = 'bold 32px sans-serif';
-        ctx.fillText(`₹${finalAmount}`, 200, 350);
+        ctx.fillText(`â‚¹${finalAmount}`, 200, 350);
         ctx.fillStyle = '#64748b';
         ctx.font = '13px sans-serif';
-        ctx.fillText('PhonePe • Paytm • Any UPI', 200, 385);
-        ctx.fillText('🔒 100% Secure Payment', 200, 410);
+        ctx.fillText('PhonePe â€¢ Paytm â€¢ Any UPI', 200, 385);
+        ctx.fillText('ðŸ”’ 100% Secure Payment', 200, 410);
         const a = document.createElement('a');
         a.href = canvas.toDataURL('image/png');
         a.download = `QR_${orderId}.png`;
@@ -679,15 +679,15 @@ export function CheckoutPayment() {
     } catch { window.open(qrCodeUrl, '_blank'); }
   };
 
-  // ── Payment methods definition ─────────────────────────────────────────────
+  // â”€â”€ Payment methods definition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const upiMethods = [
     { id: 'phonepe',  name: 'PhonePe',      desc: 'Pay seamlessly via PhonePe', icon: 'https://img.icons8.com/color/96/phone-pe.png',                                      fast: true  },
-    { id: 'paytm',    name: 'Paytm UPI',    desc: 'Flat ₹30 Cashback applied',  icon: 'https://img.icons8.com/color/96/paytm.png',                                         cashback: true },
+    { id: 'paytm',    name: 'Paytm UPI',    desc: 'Flat â‚¹30 Cashback applied',  icon: 'https://img.icons8.com/color/96/paytm.png',                                         cashback: true },
     { id: 'qr_code',  name: 'Scan QR Code', desc: 'Scan with any UPI app',      lucide: <QrCode className="w-5 h-5" /> },
   ];
 
   const onlineMethods = [
-    { id: 'cashfree', name: 'Card / Net Banking by Cashfree', desc: 'Debit & credit cards, net banking, wallets — Indian PG', icon: 'https://img.icons8.com/color/96/credit-card.png', secure: true, lucide: undefined },
+    { id: 'cashfree', name: 'Card / Net Banking by Cashfree', desc: 'Debit & credit cards, net banking, wallets â€” Indian PG', icon: undefined, lucide: <CreditCard className="w-5 h-5" />, secure: true },
   ];
 
   return cashfreeOnly ? (
@@ -702,7 +702,7 @@ export function CheckoutPayment() {
             Payment via Cashfree
           </h1>
           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mt-0.5">
-            {totalQuantity} item{totalQuantity !== 1 ? 's' : ''} • To Pay: ₹{formatPrice(finalAmount)}
+            {totalQuantity} item{totalQuantity !== 1 ? 's' : ''} â€¢ To Pay: â‚¹{formatPrice(finalAmount)}
           </span>
         </div>
       </header>
@@ -737,7 +737,7 @@ export function CheckoutPayment() {
         ) : (
           <div className="w-full max-w-[340px] text-center">
             <div className="w-14 h-14 border-[3px] border-[#9f2089]/20 border-t-[#9f2089] rounded-full animate-spin mx-auto mb-5" />
-            <h3 className="text-[17px] font-extrabold text-[#02060ce6] mb-1">Connecting to Cashfree…</h3>
+            <h3 className="text-[17px] font-extrabold text-[#02060ce6] mb-1">Connecting to Cashfreeâ€¦</h3>
             <p className="text-[13px] font-semibold text-gray-500">
               Redirecting you to the secure Cashfree payment page.
             </p>
@@ -748,7 +748,7 @@ export function CheckoutPayment() {
   ) : (
     <div className="fixed inset-0 z-50 bg-[#f0f2f5] flex flex-col font-sans select-none overflow-hidden">
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <header className="bg-white px-4 h-[60px] flex items-center shadow-sm sticky top-0 z-40 shrink-0">
         <button onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center mr-3 active:scale-95 transition-transform">
@@ -759,12 +759,12 @@ export function CheckoutPayment() {
             Payment Options
           </h1>
           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
-            {totalQuantity} item{totalQuantity !== 1 ? 's' : ''} • To Pay: ₹{formatPrice(finalAmount)}
+            {totalQuantity} item{totalQuantity !== 1 ? 's' : ''} â€¢ To Pay: â‚¹{formatPrice(finalAmount)}
           </span>
         </div>
       </header>
 
-      {/* ── Scrollable body ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ Scrollable body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <main className="flex-1 overflow-y-auto pb-32 px-4 pt-4">
 
         {/* Free delivery banner */}
@@ -775,7 +775,7 @@ export function CheckoutPayment() {
             className="h-5 drop-shadow-sm" alt="Free delivery" />
           <div>
             <p className="text-[13px] font-extrabold text-[#02060ce6] leading-tight">Free delivery applied!</p>
-            <p className="text-[11px] text-[#9f2089] font-bold mt-0.5">You saved ₹40 on this order</p>
+            <p className="text-[11px] text-[#9f2089] font-bold mt-0.5">You saved â‚¹40 on this order</p>
           </div>
         </motion.div>
 
@@ -787,7 +787,7 @@ export function CheckoutPayment() {
             <span className="text-[14px] font-extrabold text-[#02060ce6]">
               Order Summary ({totalQuantity} item{totalQuantity !== 1 ? 's' : ''})
             </span>
-            <span className="text-[14px] font-black text-[#02060ce6]">₹{formatPrice(finalAmount)}</span>
+            <span className="text-[14px] font-black text-[#02060ce6]">â‚¹{formatPrice(finalAmount)}</span>
           </div>
           <div className="space-y-3">
             {orderItems.map((item, idx) => (
@@ -812,10 +812,10 @@ export function CheckoutPayment() {
                     <span className="text-[10.5px] font-extrabold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md">
                       Qty {item.quantity}
                     </span>
-                    <span className="text-[11px] text-gray-400">(₹{formatPrice(item.unitPrice)}/pc)</span>
+                    <span className="text-[11px] text-gray-400">(â‚¹{formatPrice(item.unitPrice)}/pc)</span>
                     {item.origUnitPrice > item.unitPrice && (
                       <>
-                        <span className="text-[10.5px] text-gray-400 line-through">MRP ₹{formatPrice(item.origUnitPrice)}</span>
+                        <span className="text-[10.5px] text-gray-400 line-through">MRP â‚¹{formatPrice(item.origUnitPrice)}</span>
                         <span className="text-[10.5px] text-[#208447] font-bold">
                           {Math.round(((item.origUnitPrice - item.unitPrice) / item.origUnitPrice) * 100)}% off
                         </span>
@@ -824,9 +824,9 @@ export function CheckoutPayment() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end shrink-0">
-                  <span className="text-[13px] font-black text-[#02060ce6]">₹{formatPrice(item.unitPrice * item.quantity)}</span>
+                  <span className="text-[13px] font-black text-[#02060ce6]">â‚¹{formatPrice(item.unitPrice * item.quantity)}</span>
                   {item.origUnitPrice > item.unitPrice && (
-                    <span className="text-[10px] text-gray-400 line-through">₹{formatPrice(item.origUnitPrice * item.quantity)}</span>
+                    <span className="text-[10px] text-gray-400 line-through">â‚¹{formatPrice(item.origUnitPrice * item.quantity)}</span>
                   )}
                 </div>
               </div>
@@ -952,17 +952,17 @@ export function CheckoutPayment() {
           </div>
           <div className="px-4 pb-4 border-t border-gray-100 pt-3 bg-gray-50/40 space-y-2 text-[13px]">
             {mrpSubtotal > 0 && (
-              <div className="flex justify-between text-gray-600"><span>Items subtotal (MRP)</span><span>₹{formatPrice(mrpSubtotal)}</span></div>
+              <div className="flex justify-between text-gray-600"><span>Items subtotal (MRP)</span><span>â‚¹{formatPrice(mrpSubtotal)}</span></div>
             )}
             {productDiscount > 0 && (
-              <div className="flex justify-between text-[#038d63] font-bold"><span>Discount on products</span><span>-₹{formatPrice(productDiscount)}</span></div>
+              <div className="flex justify-between text-[#038d63] font-bold"><span>Discount on products</span><span>-â‚¹{formatPrice(productDiscount)}</span></div>
             )}
             {volumeDiscount > 0 && (
-              <div className="flex justify-between text-[#038d63] font-bold"><span>Volume discount</span><span>-₹{formatPrice(volumeDiscount)}</span></div>
+              <div className="flex justify-between text-[#038d63] font-bold"><span>Volume discount</span><span>-â‚¹{formatPrice(volumeDiscount)}</span></div>
             )}
             <div className="flex justify-between text-[#038d63] font-bold"><span>Delivery</span><span>FREE</span></div>
             <div className="flex justify-between font-black text-[#02060ce6] border-t border-gray-200 pt-2">
-              <span>Total</span><span>₹{formatPrice(finalAmount)}</span>
+              <span>Total</span><span>â‚¹{formatPrice(finalAmount)}</span>
             </div>
           </div>
         </motion.div>
@@ -975,16 +975,16 @@ export function CheckoutPayment() {
         </motion.div>
       </main>
 
-      {/* ── Sticky CTA ──────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Sticky CTA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="bg-white/95 backdrop-blur-md p-3 pb-[calc(12px+env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(0,0,0,0.06)] z-40 shrink-0">
         <button
           onClick={initiatePayment}
           className="w-full bg-[#9f2089] text-white font-extrabold text-[17px] h-[52px] rounded-2xl shadow-[0_8px_20px_rgba(159,32,137,0.3)] flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-[#831871]">
-          Pay securely ₹{formatPrice(finalAmount)}
+          Pay securely â‚¹{formatPrice(finalAmount)}
         </button>
       </div>
 
-      {/* ── Redirecting toast ───────────────────────────────────────────────── */}
+      {/* â”€â”€ Redirecting toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {isRedirecting && (
           <motion.div
@@ -995,7 +995,7 @@ export function CheckoutPayment() {
         )}
       </AnimatePresence>
 
-      {/* ── Payment success / failed overlay (non-QR methods) ──────────────── */}
+      {/* â”€â”€ Payment success / failed overlay (non-QR methods) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {pollingOrderId && !showQRModal && paymentStatus !== null && (
           <motion.div
@@ -1013,7 +1013,7 @@ export function CheckoutPayment() {
                     <Check className="w-8 h-8 text-green-600 stroke-[3]" />
                   </div>
                   <h3 className="text-[20px] font-extrabold text-[#02060ce6] mb-1">Payment Successful!</h3>
-                  <p className="text-[13px] font-bold text-gray-500">Order {pollingOrderId} confirmed. Redirecting…</p>
+                  <p className="text-[13px] font-bold text-gray-500">Order {pollingOrderId} confirmed. Redirectingâ€¦</p>
                 </>
               ) : paymentStatus === 'failed' ? (
                 <>
@@ -1041,24 +1041,24 @@ export function CheckoutPayment() {
     <>
       <div className="w-12 h-12 border-[3px] border-[#9f2089]/20 border-t-[#9f2089] rounded-full animate-spin mx-auto mb-4" />
       <h3 className="text-[16px] font-bold text-[#02060ce6]">
-        {openingApp ? 'Opening UPI App…' : 'Waiting for Payment…'}
+        {openingApp ? 'Opening UPI Appâ€¦' : 'Waiting for Paymentâ€¦'}
       </h3>
       <p className="text-[12px] text-gray-500 mt-1">
         {openingApp ? (
           <>
-            Opening <span className="font-bold text-[#9f2089]">{appName}</span> with ₹{finalAmount} pre-filled.<br />
-            <span>Return here after paying — we'll verify automatically.</span>
+            Opening <span className="font-bold text-[#9f2089]">{appName}</span> with â‚¹{finalAmount} pre-filled.<br />
+            <span>Return here after paying â€” we'll verify automatically.</span>
           </>
         ) : (
           <>
-            Complete ₹{finalAmount} in your UPI app.<br />
+            Complete â‚¹{finalAmount} in your UPI app.<br />
             <span className="font-bold text-[#9f2089]">We'll verify your payment once it's done.</span>
           </>
         )}
       </p>
       <button onClick={openUpiApp} disabled={openingApp}
         className="mt-3 w-full bg-[#9f2089] text-white font-extrabold text-[14px] py-3 rounded-xl hover:bg-[#831871] transition-colors disabled:opacity-60 disabled:cursor-wait">
-        {openingApp ? 'Opening UPI App…' : 'Open UPI App'}
+        {openingApp ? 'Opening UPI Appâ€¦' : 'Open UPI App'}
       </button>
       <button onClick={() => {
         setPollingOrderId(null); setPaymentStatus(null);
@@ -1073,7 +1073,7 @@ export function CheckoutPayment() {
         )}
       </AnimatePresence>
 
-      {/* ── QR Modal ────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ QR Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <AnimatePresence>
         {showQRModal && (
           <motion.div
@@ -1094,7 +1094,7 @@ export function CheckoutPayment() {
 
               <h3 className="text-[18px] font-extrabold text-[#02060ce6] mb-1">Scan QR with any UPI App</h3>
               <p className="text-[12px] font-bold text-gray-500 mb-4">
-                Order <span className="text-[#9f2089]">{orderId}</span> • Expires in{' '}
+                Order <span className="text-[#9f2089]">{orderId}</span> â€¢ Expires in{' '}
                 <span className="text-red-500 font-bold">
                   {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                 </span>
@@ -1104,7 +1104,7 @@ export function CheckoutPayment() {
                 <img src={qrCodeUrl} className="w-[180px] h-[180px] object-contain" alt="QR Code" />
               </div>
 
-              <div className="text-[24px] font-black text-[#9f2089] mb-1">₹{formatPrice(finalAmount)}</div>
+              <div className="text-[24px] font-black text-[#9f2089] mb-1">â‚¹{formatPrice(finalAmount)}</div>
               <p className="text-[11px] text-gray-400 font-bold mb-4">UPI: {UPI_ADDRESS}</p>
 
               <button onClick={handleDownloadQR}
@@ -1129,7 +1129,7 @@ export function CheckoutPayment() {
               <button
                 onClick={handleUTRSubmit}
                 className="w-full bg-[#02060ce6] text-white font-extrabold text-[15px] py-3.5 rounded-xl active:scale-95 transition-transform">
-                Confirm Payment ✓
+                Confirm Payment âœ“
               </button>
             </motion.div>
           </motion.div>

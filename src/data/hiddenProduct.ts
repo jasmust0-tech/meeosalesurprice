@@ -1,4 +1,4 @@
-import { Product } from '../types';
+﻿import { Product } from '../types';
 
 export const hiddenTestProduct: Product = {
   id: 'PRODUCT-LOVEP1',
@@ -10,9 +10,9 @@ export const hiddenTestProduct: Product = {
   discount: '99% OFF',
   rating: 4.9,
   reviewsCount: 1,
-  image: 'https://images.meesho.com/images/products/274719659/4j7z2_512.webp',
+  image: 'https://placehold.co/400x400/f3f4f6/6b7280?text=Product',
   images: [
-    'https://images.meesho.com/images/products/274719659/4j7z2_512.webp'
+    'https://placehold.co/400x400/f3f4f6/6b7280?text=Product'
   ],
   description: 'Special test product for payment verification.',
   sizes: ['Free Size'],

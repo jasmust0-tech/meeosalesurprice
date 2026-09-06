@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronDown, ChevronUp, Package, Sparkles, Plus, Minus, Trash2 } from 'lucide-react';
 import { getCheckoutDraft, setCheckoutDraft } from '../data/checkoutDraft';
@@ -38,7 +38,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
           id: it.id || prod.id || `item-${Math.random()}`,
           productId: it.productId || prod.id,
           title: prod.title || 'Product',
-          image: prod.image || (Array.isArray(prod.images) ? prod.images[0] : null) || 'https://images.meesho.com/images/products/274719659/4j7z2_512.webp',
+          image: prod.image || (Array.isArray(prod.images) ? prod.images[0] : null) || 'https://placehold.co/400x400/f3f4f6/6b7280?text=Product',
           selectedSize: it.selectedSize || prod.sizes?.[0] || 'Standard',
           selectedColor: it.selectedColor || prod.colors?.[0] || 'Default',
           quantity: qty,
@@ -57,7 +57,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
         id: rawProduct.id || 'single-item',
         productId: rawProduct.id,
         title: rawProduct.title || 'Trendy Graceful Women Pink Long Anarkali...',
-        image: rawProduct.image || (Array.isArray(rawProduct.images) ? rawProduct.images[0] : null) || 'https://images.meesho.com/images/products/274719659/4j7z2_512.webp',
+        image: rawProduct.image || (Array.isArray(rawProduct.images) ? rawProduct.images[0] : null) || 'https://placehold.co/400x400/f3f4f6/6b7280?text=Product',
         selectedSize: rawProduct.selectedSize || 'Free Size',
         selectedColor: rawProduct.selectedColor || 'Default',
         quantity: qty,
@@ -72,7 +72,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
         id: 'default',
         productId: 'default',
         title: 'Trendy Graceful Women Pink Long Anarkali...',
-        image: 'https://images.meesho.com/images/products/274719659/4j7z2_512.webp',
+        image: 'https://placehold.co/400x400/f3f4f6/6b7280?text=Product',
         selectedSize: 'Free Size',
         selectedColor: 'Default',
         quantity: 1,
@@ -210,7 +210,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
           <div className="text-center pt-2.5 pb-1 relative z-10">
             <span className="text-[#208447] font-bold text-[15px]">SPECIAL OFFER APPLIED</span>
             <span className="text-gray-700 font-medium text-[13.5px] ml-1">
-              (Save ₹{discountAmount} on this order)
+              (Save â‚¹{discountAmount} on this order)
             </span>
           </div>
           <svg className="absolute w-full h-[10px] bottom-0 left-0 right-0 z-10" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
@@ -235,7 +235,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
             {volumeDiscountAmount > 0 && (
               <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <Sparkles className="w-3 h-3 text-emerald-600" />
-                Extra ₹{volumeDiscountAmount} OFF
+                Extra â‚¹{volumeDiscountAmount} OFF
               </span>
             )}
           </div>
@@ -258,11 +258,11 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
                     {item.selectedColor && item.selectedColor.toLowerCase() !== 'default' && (
                       <span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">Color: {item.selectedColor}</span>
                     )}
-                    <span className="text-[11px] font-medium text-gray-500">₹{item.unitPrice}/pc</span>
+                    <span className="text-[11px] font-medium text-gray-500">â‚¹{item.unitPrice}/pc</span>
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className="text-[15px] font-bold text-gray-900">₹{item.unitPrice * item.quantity}</span>
-                    <span className="text-[12px] text-gray-400 line-through">₹{item.origUnitPrice * item.quantity}</span>
+                    <span className="text-[15px] font-bold text-gray-900">â‚¹{item.unitPrice * item.quantity}</span>
+                    <span className="text-[12px] text-gray-400 line-through">â‚¹{item.origUnitPrice * item.quantity}</span>
                     {item.origUnitPrice > item.unitPrice && (
                       <span className="text-[11.5px] text-[#208447] font-bold">
                         {Math.round(((item.origUnitPrice - item.unitPrice) / item.origUnitPrice) * 100)}% Off
@@ -316,7 +316,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
 
           <div className="pt-2 border-t border-gray-100 text-[12px] text-gray-500 font-medium flex items-center justify-between">
             <span>Sold by: MR International Fashion</span>
-            <span className="text-emerald-700 font-bold text-[11px]">✓ Verified Seller</span>
+            <span className="text-emerald-700 font-bold text-[11px]">âœ“ Verified Seller</span>
           </div>
         </div>
 
@@ -334,7 +334,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
           <div className="flex justify-between items-start mt-3">
             <div className="pr-4">
               <div className="text-[14px] text-gray-600 font-medium">
-                {address.name} <span className="text-gray-400 mx-1">•</span> {address.contact}
+                {address.name} <span className="text-gray-400 mx-1">â€¢</span> {address.contact}
               </div>
               <div className="text-[13px] text-gray-500 leading-snug mt-1">
                 {address.houseNo}, {address.roadName}, {address.city}, {address.stateName}, {address.pincode}
@@ -370,7 +370,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
               Price Details ({totalQuantity} {totalQuantity === 1 ? 'item' : 'items'})
             </span>
             <div className="flex items-center gap-2">
-              {!isPriceDetailsOpen && <span className="text-[15px] font-bold text-gray-900">₹{displayPrice}</span>}
+              {!isPriceDetailsOpen && <span className="text-[15px] font-bold text-gray-900">â‚¹{displayPrice}</span>}
               {isPriceDetailsOpen ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
             </div>
           </div>
@@ -379,18 +379,18 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
             <div className="px-4 pb-4 pt-1 border-t border-gray-50">
               <div className="flex justify-between items-center py-2">
                 <span className="text-[13px] text-gray-600">Product Total ({totalQuantity} items)</span>
-                <span className="text-[13px] text-gray-700">+ ₹{itemsOriginalTotal}</span>
+                <span className="text-[13px] text-gray-700">+ â‚¹{itemsOriginalTotal}</span>
               </div>
               {discountAmount > 0 && (
                 <div className="flex justify-between items-center py-2">
                   <span className="text-[13px] text-[#208447]">Total Savings &amp; Discounts</span>
-                  <span className="text-[13px] text-[#208447] font-bold">- ₹{discountAmount}</span>
+                  <span className="text-[13px] text-[#208447] font-bold">- â‚¹{discountAmount}</span>
                 </div>
               )}
               {volumeDiscountAmount > 0 && (
                 <div className="flex justify-between items-center py-2">
                   <span className="text-[13px] text-purple-700">Multi-Unit Volume Discount</span>
-                  <span className="text-[13px] text-purple-700 font-bold">- ₹{volumeDiscountAmount}</span>
+                  <span className="text-[13px] text-purple-700 font-bold">- â‚¹{volumeDiscountAmount}</span>
                 </div>
               )}
               <div className="flex justify-between items-center py-2">
@@ -399,7 +399,7 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
               </div>
               <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center">
                 <span className="text-[14px] font-bold text-gray-800">Order Total</span>
-                <span className="text-[16px] font-black text-gray-900">₹{displayPrice}</span>
+                <span className="text-[16px] font-black text-gray-900">â‚¹{displayPrice}</span>
               </div>
             </div>
           )}
@@ -456,10 +456,10 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
       <div className="bg-white border-t border-gray-200 p-3 pb-safe flex items-center justify-between shrink-0 z-20 shadow-lg">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <span className="text-[19px] font-black text-gray-900">₹{displayPrice}</span>
+            <span className="text-[19px] font-black text-gray-900">â‚¹{displayPrice}</span>
             {discountAmount > 0 && (
               <span className="bg-[#e4f6eb] text-[#208447] text-[10px] font-bold px-1.5 py-0.5 rounded">
-                ₹{discountAmount} OFF
+                â‚¹{discountAmount} OFF
               </span>
             )}
           </div>
