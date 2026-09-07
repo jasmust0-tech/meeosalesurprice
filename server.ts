@@ -879,23 +879,28 @@ app.get("/api/listener/pending", async (req, res) => {
   }
 });
 
+// Shared order creation. Used by POST /api/orders and by the single-call
+// Cashfree start endpoint so the order and the Cashfree order are created in
+// one request (fast, PHP-style redirect — no extra round trip).
+function createLocalOrder(payload: any): any {
+  const orderId = payload?.id || `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+  const order = {
+    id: orderId,
+    ...payload,
+    status: payload?.status || "Confirmed",
+    createdAt: new Date().toISOString()
+  };
+  ordersStore.unshift(order);
+  cartStore = [];
+  invalidateOrdersCache();
+  persistOrdersToFile();
+  broadcastOrdersChanged({ type: "created", order });
+  return order;
+}
+
 app.post("/api/orders", async (req, res) => {
   try {
-    const orderId = req.body.id || `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    const order = {
-      id: orderId,
-      ...req.body,
-      status: req.body.status || "Confirmed",
-      createdAt: new Date().toISOString()
-    };
-    ordersStore.unshift(order);
-    cartStore = [];
-    invalidateOrdersCache();
-
-    // Persist to the local cache so the order survives restarts / cold-starts.
-    persistOrdersToFile();
-
-    broadcastOrdersChanged({ type: "created", order });
+    const order = createLocalOrder(req.body);
     res.status(201).json(order);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -1027,17 +1032,26 @@ async function fetchCashfreeOrder(orderId: string): Promise<{ ok: boolean; statu
 }
 
 // Create a Cashfree order for a local order (returns payment_session_id).
+// This is the single-call entry point the storefront uses to open Cashfree
+// (PHP-style): if the order does not exist yet it is created here from the
+// `order` payload in the same request, so the client needs just ONE round trip
+// before the hosted checkout opens — no visible "connecting" pause.
 app.post("/api/payments/cashfree/create", async (req, res) => {
   const cf = settingsStore.cashfree;
   if (!cf || !cf.enabled || !cf.clientId || !cf.secretKey) {
     return res.status(400).json({ error: "Cashfree is not configured yet. Add your API keys in the admin panel." });
   }
-  const { orderId, amount, customer = {} } = req.body || {};
+  const { orderId, amount, customer = {}, order = null } = req.body || {};
 
-  // Server-authoritative: the order must already exist locally, and the amount
-  // is taken from the stored order (not the client), so the charge matches the
-  // customer's confirmed total.
-  const existing = orderId ? findLocalOrder(String(orderId)) : null;
+  // Server-authoritative: the order must exist locally, and the amount is taken
+  // from the stored order (not the client) so the charge matches the totals the
+  // client already confirmed. If the order has not been persisted yet (single
+  // call flow) create it now from the supplied payload.
+  let existing = orderId ? findLocalOrder(String(orderId)) : null;
+  if (!existing && order) {
+    createLocalOrder({ ...order, id: String(orderId || order.id) });
+    existing = orderId ? findLocalOrder(String(orderId)) : findLocalOrder(String(order?.id));
+  }
   if (!existing) {
     return res.status(404).json({ error: "Order not found. Please place the order before paying." });
   }

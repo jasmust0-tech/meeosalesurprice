@@ -578,7 +578,6 @@ const checkPaymentStatus = async () => {
 
     // â”€â”€ Cashfree: online payment gateway (cards / UPI / net banking / wallets) â”€â”€
     if (selectedMethod === 'cashfree') {
-      try { await saveOrder(freshId, 'Cashfree'); } catch {}
       cancelCashfreeRef.current = false;
       setPollingOrderId(freshId);
       setPaymentStatus('pending');
@@ -587,6 +586,8 @@ const checkPaymentStatus = async () => {
       sessionStorage.setItem('meesho_pending_polling', '1');
       sessionStorage.setItem('meesho_cashfree_session', '1');
       try {
+        // Single-call start (PHP-style): the server stores the order and creates
+        // the Cashfree order in one request, so Cashfree opens right away.
         const res = await fetch('/api/payments/cashfree/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -594,6 +595,20 @@ const checkPaymentStatus = async () => {
             orderId: freshId,
             amount: finalAmount,
             customer: { name: address.name, phone: address.contact, email: address.email || '' },
+            order: {
+              id: freshId,
+              items: orderItems.map(it => ({
+                productId: it.productId, product: it.product, quantity: it.quantity,
+                selectedSize: it.selectedSize, selectedColor: it.selectedColor,
+                resellPrice: it.unitPrice, price: it.unitPrice
+              })),
+              customerName: address.name,
+              customerPhone: address.contact,
+              customerAddress: `${address.houseNo}, ${address.roadName}, ${address.city}, ${address.stateName} - ${address.pincode}`,
+              city: address.city, pincode: address.pincode,
+              totalWholesaleAmount: finalAmount, totalResellAmount: finalAmount,
+              totalMarginEarned: 0, paymentMethod: 'Cashfree', status: 'Pending'
+            },
           }),
         });
         if (cancelCashfreeRef.current) return;
@@ -692,13 +707,20 @@ const checkPaymentStatus = async () => {
   useEffect(() => {
     if (forceMethodsView) return;
     if (autoStartedRef.current) return;
-    if (configLoading) return; // wait until /api/config loads
     // If we arrived back from the Cashfree payment page (?order_id=...) do NOT
     // auto-open a brand-new checkout — that re-opens Cashfree endlessly after
     // the customer pays or presses back. Restore polling instead (handled in
     // the restore effect) and let the customer see the result.
     if (new URLSearchParams(location.search).get('order_id')) return;
+    // Cashfree-only checkouts (Buy Now / cart "Pay securely") open Cashfree
+    // immediately without waiting for /api/config — exactly like the PHP site,
+    // where the redirect happens in one server step with no "connecting" pause.
+    if (!cashfreeOnly && configLoading) return; // only the full list page waits
     autoStartedRef.current = true;
+    if (cashfreeOnly) {
+      initiatePayment();
+      return;
+    }
     // Cashfree is enabled, or the config could not be read (fail open): the
     // server validates the keys itself, so attempt the checkout either way.
     if (!cashfreeEnabled && !configFailed) {
