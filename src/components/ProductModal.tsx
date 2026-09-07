@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Product, ProductDetailItem, Review } from '../types';
 import { getReviewsForProduct } from '../data/reviewsData';
 import { clearCheckoutDraft } from '../data/checkoutDraft';
+import { genCheckoutOrderId, openCashfreeCheckout } from '../lib/cashfreeCheckout';
 import { ProductCard } from './ProductCard';
 import { OfferTimer } from './OfferTimer';
 import { 
@@ -1123,16 +1124,17 @@ export function ProductModal({ product, allProducts = [], onClose, onShareWhatsA
                     quantity: modalQuantity
                   };
                   clearCheckoutDraft();
-                  navigate('/checkout/payment', { 
-                    state: { 
-                      items: [singleItem],
-                      product: { ...currentProduct, price: effectiveUnitPrice, selectedSize, selectedColor, quantity: modalQuantity },
-                      subtotal: standardTotalPrice,
-                      volumeDiscountAmount: volumeSavingsAmount,
-                      totalPrice: totalVolumePrice,
-                      totalQuantity: modalQuantity,
-                      autoCashfree: true
-                    } 
+                  const st = { 
+                    items: [singleItem],
+                    product: { ...currentProduct, price: effectiveUnitPrice, selectedSize, selectedColor, quantity: modalQuantity },
+                    subtotal: standardTotalPrice,
+                    volumeDiscountAmount: volumeSavingsAmount,
+                    totalPrice: totalVolumePrice,
+                    totalQuantity: modalQuantity,
+                    autoCashfree: true
+                  };
+                  openCashfreeCheckout({ ...st, orderId: genCheckoutOrderId() }).catch(() => {
+                    navigate('/checkout/payment', { state: st });
                   });
                 }
               }}

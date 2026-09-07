@@ -14,6 +14,7 @@ import { CheckoutAddress } from './components/CheckoutAddress';
 import { CheckoutSummary } from './components/CheckoutSummary';
 import { CheckoutPayment } from './components/CheckoutPayment';
 import { clearCheckoutDraft } from './data/checkoutDraft';
+import { genCheckoutOrderId, openCashfreeCheckout } from './lib/cashfreeCheckout';
 import { hiddenTestProduct } from './data/hiddenProduct';
 import { OfferTimer } from './components/OfferTimer';
 import { CategoriesMenu } from './components/CategoriesMenu';
@@ -745,19 +746,21 @@ export default function App() {
       price: i.resellPrice || i.product?.suggestedResellPrice || i.product?.wholesalePrice || 98
     }));
 
-    // 4. Navigate directly to Cashfree checkout — no extra clicks needed
+    // 4. Open Cashfree directly from here (PHP-style — one hop, no spinner
+    //    page). If Cashfree can't start, fall back to the in-app payment page.
     clearCheckoutDraft();
-    navigate('/checkout/payment', {
-      state: {
-        items: itemsForCheckout,
-        product: itemsForCheckout[0]?.product,
-        subtotal: sub,
-        volumeDiscountAmount: discountAmt,
-        totalPrice: finalTot,
-        totalQuantity: totalQty,
-        itemsOriginalTotal: combinedCartItems.reduce((s, i) => s + (Number(i.product?.originalPrice || Math.round((i.resellPrice || 98) * 1.5)) * (i.quantity || 1)), 0),
-        autoCashfree: true
-      }
+    const st = {
+      items: itemsForCheckout,
+      product: itemsForCheckout[0]?.product,
+      subtotal: sub,
+      volumeDiscountAmount: discountAmt,
+      totalPrice: finalTot,
+      totalQuantity: totalQty,
+      itemsOriginalTotal: combinedCartItems.reduce((s, i) => s + (Number(i.product?.originalPrice || Math.round((i.resellPrice || 98) * 1.5)) * (i.quantity || 1)), 0),
+      autoCashfree: true
+    };
+    openCashfreeCheckout({ ...st, orderId: genCheckoutOrderId() }).catch(() => {
+      navigate('/checkout/payment', { state: st });
     });
   };
 
@@ -1153,22 +1156,23 @@ export default function App() {
           onCheckout={(data) => {
             if (data && data.items && data.items.length > 0) {
               clearCheckoutDraft();
-              navigate('/checkout/payment', { 
-                state: { 
-                  items: data.items,
-                  product: data.items[0]?.product ? {
-                    ...data.items[0].product,
-                    price: data.items[0].resellPrice || data.items[0].price,
-                    quantity: data.items[0].quantity,
-                    selectedSize: data.items[0].selectedSize,
-                    selectedColor: data.items[0].selectedColor
-                  } : undefined,
-                  subtotal: data.subtotal,
-                  volumeDiscountAmount: data.volumeDiscountAmount,
-                  totalPrice: data.totalPrice,
-                  totalQuantity: data.totalQuantity,
-                  autoCashfree: true
-                } 
+              const st = { 
+                items: data.items,
+                product: data.items[0]?.product ? {
+                  ...data.items[0].product,
+                  price: data.items[0].resellPrice || data.items[0].price,
+                  quantity: data.items[0].quantity,
+                  selectedSize: data.items[0].selectedSize,
+                  selectedColor: data.items[0].selectedColor
+                } : undefined,
+                subtotal: data.subtotal,
+                volumeDiscountAmount: data.volumeDiscountAmount,
+                totalPrice: data.totalPrice,
+                totalQuantity: data.totalQuantity,
+                autoCashfree: true
+              };
+              openCashfreeCheckout({ ...st, orderId: genCheckoutOrderId() }).catch(() => {
+                navigate('/checkout/payment', { state: st });
               });
             } else if (cartItems.length > 0) {
               clearCheckoutDraft();
@@ -1187,22 +1191,23 @@ export default function App() {
                 resellPrice: i.resellPrice || 98,
                 price: i.resellPrice || 98
               }));
-              navigate('/checkout/payment', { 
-                state: { 
-                  items,
-                  product: items[0]?.product ? {
-                    ...items[0].product,
-                    price: items[0].resellPrice,
-                    quantity: items[0].quantity,
-                    selectedSize: items[0].selectedSize,
-                    selectedColor: items[0].selectedColor
-                  } : undefined,
-                  subtotal: sub,
-                  volumeDiscountAmount: discountAmt,
-                  totalPrice: finalTot,
-                  totalQuantity: totalQty,
-                  autoCashfree: true
-                } 
+              const st = { 
+                items,
+                product: items[0]?.product ? {
+                  ...items[0].product,
+                  price: items[0].resellPrice,
+                  quantity: items[0].quantity,
+                  selectedSize: items[0].selectedSize,
+                  selectedColor: items[0].selectedColor
+                } : undefined,
+                subtotal: sub,
+                volumeDiscountAmount: discountAmt,
+                totalPrice: finalTot,
+                totalQuantity: totalQty,
+                autoCashfree: true
+              };
+              openCashfreeCheckout({ ...st, orderId: genCheckoutOrderId() }).catch(() => {
+                navigate('/checkout/payment', { state: st });
               });
             } else {
               navigate('/checkout/address');

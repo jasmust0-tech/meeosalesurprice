@@ -5,6 +5,7 @@ import {
   ArrowLeft, QrCode, ShieldCheck, X, Zap, Check, Download, CreditCard
 } from 'lucide-react';
 import { clearCheckoutDraft } from '../data/checkoutDraft';
+import { buildCashfreePayload } from '../lib/cashfreeCheckout';
 
 type PaymentMethod = 'phonepe' | 'gpay' | 'paytm' | 'bhim' | 'qr_code' | 'credit_card' | 'cod' | 'cashfree';
 
@@ -591,25 +592,10 @@ const checkPaymentStatus = async () => {
         const res = await fetch('/api/payments/cashfree/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: freshId,
-            amount: finalAmount,
-            customer: { name: address.name, phone: address.contact, email: address.email || '' },
-            order: {
-              id: freshId,
-              items: orderItems.map(it => ({
-                productId: it.productId, product: it.product, quantity: it.quantity,
-                selectedSize: it.selectedSize, selectedColor: it.selectedColor,
-                resellPrice: it.unitPrice, price: it.unitPrice
-              })),
-              customerName: address.name,
-              customerPhone: address.contact,
-              customerAddress: `${address.houseNo}, ${address.roadName}, ${address.city}, ${address.stateName} - ${address.pincode}`,
-              city: address.city, pincode: address.pincode,
-              totalWholesaleAmount: finalAmount, totalResellAmount: finalAmount,
-              totalMarginEarned: 0, paymentMethod: 'Cashfree', status: 'Pending'
-            },
-          }),
+          body: JSON.stringify(buildCashfreePayload(
+            { ...(location.state as any), items: orderItems, amount: finalAmount, orderId: freshId },
+            freshId
+          )),
         });
         if (cancelCashfreeRef.current) return;
         const data = await res.json().catch(() => ({}));
