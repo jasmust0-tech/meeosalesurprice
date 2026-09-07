@@ -362,7 +362,7 @@ export function CheckoutPayment() {
   }, [pollingOrderId, paymentStatus, timeLeft]);
 
   // â”€â”€ Poll server for payment confirmation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const checkPaymentStatus = async () => {
+const checkPaymentStatus = async () => {
     if (!pollingOrderId || paymentStatus !== 'pending') return;
     try {
       const res = await fetch(`/api/orders/${pollingOrderId}/status`);
@@ -384,12 +384,38 @@ export function CheckoutPayment() {
       } else if (data.status === 'Failed') {
         if (data.paymentFailed === true) {
           // A genuine gateway/webhook-confirmed failure (Cashfree, Paytm
-          // scanner) â€” stop and let the customer retry or cancel.
+          // scanner) — stop and let the customer retry or cancel.
           setPaymentErrorMsg(data.paymentError || 'Your payment did not complete.');
           setPaymentStatus('failed');
         }
         // Otherwise a temporary pending-state marker: keep waiting.
         return;
+      } else if (data.paidThrough === 'cashfree' || data.paymentMethod === 'Cashfree') {
+        // Webhook has not confirmed yet — ask Cashfree's server directly so
+        // the payment is verified even when the webhook is delayed/missing.
+        try {
+          const cfRes = await fetch(`/api/payments/cashfree/status/${encodeURIComponent(pollingOrderId)}`);
+          if (cfRes.ok) {
+            const cfData = await cfRes.json();
+            if (cfData.status === 'Paid') {
+              setShowQRModal(false);
+              setPaymentStatus('success');
+              clearCheckoutDraft();
+              sessionStorage.removeItem(ORDER_ID_KEY);
+              sessionStorage.removeItem('meesho_pending_polling');
+              if (typeof (window as any).fbq === 'function') {
+                (window as any).fbq('track', 'Purchase', {
+                  value: finalAmount, currency: 'INR', content_type: 'product',
+                  content_ids: orderItems.map(i => i.productId), num_items: totalQuantity
+                });
+              }
+              redirectToDifferentCategory();
+            } else if (cfData.status === 'Failed') {
+              setPaymentErrorMsg(cfData.paymentError || 'Your payment did not complete.');
+              setPaymentStatus('failed');
+            }
+          }
+        } catch {}
       }
     } catch {}
   };
@@ -553,6 +579,18 @@ export function CheckoutPayment() {
         }
         const mode = data.environment === 'sandbox' ? 'sandbox' : 'production';
         sessionStorage.setItem('meesho_cashfree_env', mode);
+
+        // Smooth checkout: redirect the whole browser to Cashfree's hosted
+        // payment page via payment_link when available (same reliable full-page
+        // redirect the PHP version uses) — no popups or in-page iframes that
+        // can be blocked in in-app browsers / WhatsApp.
+        if (data.paymentLink) {
+          window.location.href = data.paymentLink;
+          setTimeout(() => setIsRedirecting(false), 2500);
+          return;
+        }
+
+        // Fallback: open the official Cashfree hosted checkout via the SDK.
         const CashfreeCtor = await loadCashfreeSdk();
         // Cashfree docs call Cashfree({ mode }) as a plain factory (no `new`);
         // keep a defensive fallback in case the loaded build expects a class.

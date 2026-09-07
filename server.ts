@@ -1002,6 +1002,30 @@ function updateOrderFields(orderId: string, patch: Record<string, any>) {
   return order;
 }
 
+// Look up a local order by id (orderStore). Returns the matching order or null.
+function findLocalOrder(orderId: string): any | null {
+  return ordersStore.find((o: any) => o.id === orderId) || null;
+}
+
+// Resolve the amount Cashfree should charge for a local order. To prevent
+// price tampering the server always derives the amount from the stored order,
+// never from what a client sends. Accepts a fallback amount for orders that
+// were created before this field was recorded.
+function orderPayableAmount(order: any, fallback?: number): number {
+  const fromOrder = Number(order?.totalResellAmount) || Number(order?.totalWholesaleAmount) || Number(order?.paymentAmount);
+  if (fromOrder > 0) return Math.round(fromOrder * 100) / 100;
+  const f = Number(fallback);
+  return f > 0 ? Math.round(f * 100) / 100 : 0;
+}
+
+// Query the authoritative payment status of a Cashfree order from Cashfree
+// itself (GET /orders/{order_id}). Used as a server-side fallback so a payment
+// can be confirmed even if the webhook was delayed or never delivered.
+async function fetchCashfreeOrder(orderId: string): Promise<{ ok: boolean; status: number; data: any }> {
+  const cleanId = String(orderId).replace(/[^a-zA-Z0-9_-]/g, "_");
+  return cashfreeRequest<any>(`/orders/${encodeURIComponent(cleanId)}`, "GET");
+}
+
 // Create a Cashfree order for a local order (returns payment_session_id).
 app.post("/api/payments/cashfree/create", async (req, res) => {
   const cf = settingsStore.cashfree;
@@ -1009,9 +1033,19 @@ app.post("/api/payments/cashfree/create", async (req, res) => {
     return res.status(400).json({ error: "Cashfree is not configured yet. Add your API keys in the admin panel." });
   }
   const { orderId, amount, customer = {} } = req.body || {};
-  const orderAmount = Math.round((Number(amount) || 0) * 100) / 100;
-  if (!orderId) return res.status(400).json({ error: "Order id is required" });
+
+  // Server-authoritative: the order must already exist locally, and the amount
+  // is taken from the stored order (not the client), so the charge matches the
+  // customer's confirmed total.
+  const existing = orderId ? findLocalOrder(String(orderId)) : null;
+  if (!existing) {
+    return res.status(404).json({ error: "Order not found. Please place the order before paying." });
+  }
+  const orderAmount = orderPayableAmount(existing, amount);
   if (orderAmount < 1) return res.status(400).json({ error: "Invalid order amount" });
+  if (existing.status === "Paid") {
+    return res.status(409).json({ error: "This order is already paid." });
+  }
 
   const cleanId = String(orderId).replace(/[^a-zA-Z0-9_-]/g, "_");
   const returnUrl = `${getBaseOrigin(req)}/checkout/payment?order_id=${encodeURIComponent(String(orderId))}`;
@@ -1051,16 +1085,111 @@ app.post("/api/payments/cashfree/create", async (req, res) => {
       environment: cf.environment,
       status: "PENDING",
       createdAt: new Date().toISOString(),
+      payableAmount: orderAmount,
+      paymentLink: data.payment_link || undefined,
     },
   });
 
   return res.json({
     success: true,
     paymentSessionId: data.payment_session_id,
+    paymentLink: data.payment_link || undefined,
     cfOrderId: data.cf_order_id,
     orderStatus: data.order_status,
     environment: cf.environment,
   });
+});
+
+// Server-side Cashfree order status fallback. The client polls this when it has
+// not yet received a webhook-confirmed status, so a payment is still verified
+// even if the webhook is delayed, missed or never fires (e.g. before the
+// webhook URL is configured in the Cashfree dashboard).
+app.get("/api/payments/cashfree/status/:orderId", async (req, res) => {
+  const cf = settingsStore.cashfree;
+  if (!cf || !cf.enabled || !cf.clientId || !cf.secretKey) {
+    return res.status(400).json({ error: "Cashfree is not configured" });
+  }
+  const order = findLocalOrder(String(req.params.orderId));
+  if (!order) return res.status(404).json({ error: "Order not found" });
+
+  // If a webhook already confirmed the final status, trust it and return it.
+  if (order.status === "Paid" || order.paymentFailedByGateway === true) {
+    return res.json({
+      status: order.status,
+      paymentAmount: order.paymentAmount || null,
+      paymentDate: order.paymentDate || null,
+      paymentUtr: order.paymentUtr || null,
+      cfPaymentId: order.cfPaymentId || order.cashfree?.cfPaymentId || null,
+    });
+  }
+
+  // Otherwise ask Cashfree directly for the authoritative payment status.
+  try {
+    const { ok, status, data } = await fetchCashfreeOrder(String(req.params.orderId));
+    if (!ok) {
+      return res.status(status >= 500 ? 502 : (status || 502)).json({ error: data?.message || "Could not reach Cashfree" });
+    }
+    const orderStatus = String(data.order_status || "").toUpperCase();
+    const expectedAmount = orderPayableAmount(order);
+    const payments = Array.isArray(data.payments) ? data.payments : [];
+    const successPayment = payments.find((p: any) => String(p.payment_status || "").toUpperCase() === "SUCCESS");
+
+    if (orderStatus === "PAID" || successPayment) {
+      const payment = successPayment || payments[payments.length - 1];
+      const receivedAmount = Number(payment?.payment_amount) || Number(data.order_amount) || 0;
+      // Reconcile the amount just like the webhook does.
+      const amountOk = expectedAmount <= 0 || Math.abs(receivedAmount - expectedAmount) <= 0.011;
+      if (amountOk) {
+        updateOrderFields(String(req.params.orderId), {
+          status: "Paid",
+          paymentStatus: "SUCCESS",
+          paidThrough: "cashfree",
+          paymentMethod: "Cashfree",
+          paymentAmount: receivedAmount,
+          paymentDate: payment?.payment_completion_time || payment?.payment_time || new Date().toISOString(),
+          paymentUtr: payment?.bank_reference || payment?.auth_id || "",
+          paymentError: null,
+          paymentFailedByGateway: false,
+          failedAt: null,
+          cfOrderId: data.cf_order_id || data.order_id || String(order.order_id),
+          cfPaymentId: payment?.cf_payment_id || "",
+          cashfree: {
+            cfOrderId: data.cf_order_id || String(order.order_id),
+            cfPaymentId: payment?.cf_payment_id || "",
+            paymentStatus: "SUCCESS",
+            bankReference: payment?.bank_reference || "",
+            paymentTime: payment?.payment_time || null,
+          },
+        });
+        return res.json({
+          status: "Paid",
+          paymentAmount: receivedAmount,
+          paymentDate: payment?.payment_completion_time || payment?.payment_time || new Date().toISOString(),
+          paymentUtr: payment?.bank_reference || payment?.auth_id || "",
+          cfPaymentId: payment?.cf_payment_id || "",
+        });
+      }
+      return res.json({ status: "Failed", paymentError: "Payment amount mismatch" });
+    }
+
+    if (orderStatus === "FAILED" || orderStatus === "CANCELLED" || orderStatus === "EXPIRED") {
+      const failedMsg = payments[payments.length - 1]?.payment_message || "Payment was not completed";
+      updateOrderFields(String(req.params.orderId), {
+        status: "Failed",
+        paymentStatus: "FAILED",
+        paidThrough: "cashfree",
+        paymentMethod: "Cashfree",
+        paymentFailedByGateway: true,
+        paymentError: failedMsg,
+        failedAt: new Date().toISOString(),
+      });
+      return res.json({ status: "Failed", paymentError: failedMsg });
+    }
+
+    res.json({ status: "Pending", orderStatus });
+  } catch (e: any) {
+    res.status(500).json({ error: "Failed to check Cashfree status" });
+  }
 });
 
 // Cashfree webhook endpoint (configure this URL in the Cashfree dashboard:
@@ -1080,13 +1209,10 @@ app.post("/api/payments/cashfree/webhook", async (req, res) => {
   // Cashfree secret key, base64-encoded, compared to x-webhook-signature.
   const rawBody = (req as any).rawBody || JSON.stringify(req.body);
   const expected = crypto.createHmac("sha256", cf.secretKey).update(timestamp + rawBody).digest("base64");
-  const okSig = expected === signature;
-  if (!okSig) {
-    const a = Buffer.from(expected);
-    const b = Buffer.from(signature);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      return res.status(401).json({ error: "Invalid webhook signature" });
-    }
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: "Invalid webhook signature" });
   }
 
   // Acknowledge immediately so Cashfree never retries; update the order after.
@@ -1112,12 +1238,36 @@ app.post("/api/payments/cashfree/webhook", async (req, res) => {
     if (!payment) return;
 
     if (type === "PAYMENT_SUCCESS_WEBHOOK" && successPayment) {
+      // Amount reconciliation: only accept the payment if the amount Cashfree
+      // reports matches the amount this server stored for the order. This
+      // guards against tampered webhooks / mismatched order values. A slight
+      // tolerance (1 paisa rounding) is allowed.
+      const localOrder = findLocalOrder(String(orderId));
+      const expectedAmount = localOrder ? orderPayableAmount(localOrder) : 0;
+      const receivedAmount = Number(payment.payment_amount) || Number(data.order?.order_amount) || 0;
+      if (expectedAmount > 0 && Math.abs(receivedAmount - expectedAmount) > 0.011) {
+        console.warn(
+          `Cashfree webhook: order ${orderId} amount mismatch (expected ${expectedAmount}, received ${receivedAmount}) - marking FAILED`
+        );
+        updateOrderFields(String(orderId), {
+          status: "Failed",
+          paymentStatus: "FAILED",
+          paidThrough: "cashfree",
+          paymentMethod: "Cashfree",
+          paymentFailedByGateway: true,
+          paymentError: `Payment amount mismatch (expected ₹${expectedAmount}, received ₹${receivedAmount})`,
+          failedAt: new Date().toISOString(),
+          cfPaymentId: payment.cf_payment_id || String(orderId),
+        });
+        return;
+      }
+
       const paid: Record<string, any> = {
         status: "Paid",
         paymentStatus: "SUCCESS",
         paidThrough: "cashfree",
         paymentMethod: "Cashfree",
-        paymentAmount: Number(payment.payment_amount) || Number(data.order?.order_amount) || 0,
+        paymentAmount: receivedAmount,
         paymentDate: payment.payment_completion_time || payment.payment_time || new Date().toISOString(),
         paymentUtr: payment.bank_reference || payment.auth_id || "",
         paymentError: null,
