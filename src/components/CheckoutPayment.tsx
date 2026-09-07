@@ -44,7 +44,29 @@ export function CheckoutPayment() {
   // When the user arrives from the "Continue" button the payment-method list is
   // skipped entirely: we go straight to the Cashfree checkout (or show the
   // error on a Cashfree-only screen).
-  const cashfreeOnly = (location.state as any)?.autoCashfree === true;
+  //
+  // If Cashfree is blocked (domain not yet whitelisted) the customer can tap
+  // "Pay via UPI / QR instead" which flips this flag and reveals the normal
+  // PhonePe / Paytm / QR payment list so sales are not lost while waiting for
+  // Cashfree whitelisting approval.
+  const [forceMethodsView, setForceMethodsView] = useState(false);
+  const cancelCashfreeRef = React.useRef(false);
+  const cashfreeOnly = (location.state as any)?.autoCashfree === true && !forceMethodsView;
+
+  // While the Cashfree checkout is opening we keep the chosen method so the
+  // payment list is never shown mid-redirect; used to abort an in-flight
+  // Cashfree redirect the moment the customer chooses the UPI fallback.
+  const openUpiFallback = () => {
+    cancelCashfreeRef.current = true;
+    setPollingOrderId(null);
+    setPaymentStatus(null);
+    setPaymentErrorMsg('');
+    sessionStorage.removeItem('meesho_pending_polling');
+    sessionStorage.removeItem('meesho_cashfree_session');
+    sessionStorage.removeItem('meesho_cashfree_env');
+    setForceMethodsView(true);
+    setSelectedMethod('qr_code');
+  };
 
   const rawItems = location.state?.items;
   const rawProduct = location.state?.product;
@@ -557,6 +579,7 @@ const checkPaymentStatus = async () => {
     // â”€â”€ Cashfree: online payment gateway (cards / UPI / net banking / wallets) â”€â”€
     if (selectedMethod === 'cashfree') {
       try { await saveOrder(freshId, 'Cashfree'); } catch {}
+      cancelCashfreeRef.current = false;
       setPollingOrderId(freshId);
       setPaymentStatus('pending');
       setTimeLeft(300);
@@ -573,6 +596,7 @@ const checkPaymentStatus = async () => {
             customer: { name: address.name, phone: address.contact, email: address.email || '' },
           }),
         });
+        if (cancelCashfreeRef.current) return;
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.paymentSessionId) {
           throw new Error(data.error || 'Cashfree could not start this order');
@@ -585,6 +609,7 @@ const checkPaymentStatus = async () => {
         // redirect the PHP version uses) — no popups or in-page iframes that
         // can be blocked in in-app browsers / WhatsApp.
         if (data.paymentLink) {
+          if (cancelCashfreeRef.current) return;
           window.location.href = data.paymentLink;
           setTimeout(() => setIsRedirecting(false), 2500);
           return;
@@ -665,8 +690,14 @@ const checkPaymentStatus = async () => {
   // page is shown instead.
   const autoStartedRef = React.useRef(false);
   useEffect(() => {
+    if (forceMethodsView) return;
     if (autoStartedRef.current) return;
     if (configLoading) return; // wait until /api/config loads
+    // If we arrived back from the Cashfree payment page (?order_id=...) do NOT
+    // auto-open a brand-new checkout — that re-opens Cashfree endlessly after
+    // the customer pays or presses back. Restore polling instead (handled in
+    // the restore effect) and let the customer see the result.
+    if (new URLSearchParams(location.search).get('order_id')) return;
     autoStartedRef.current = true;
     // Cashfree is enabled, or the config could not be read (fail open): the
     // server validates the keys itself, so attempt the checkout either way.
@@ -680,7 +711,7 @@ const checkPaymentStatus = async () => {
       return;
     }
     initiatePayment();
-  }, [configLoading, cashfreeEnabled, cashfreeOnly, configFailed]);
+  }, [configLoading, cashfreeEnabled, cashfreeOnly, configFailed, forceMethodsView, location.search]);
 
   // â”€â”€ Download QR code as PNG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDownloadQR = async () => {
@@ -761,6 +792,11 @@ const checkPaymentStatus = async () => {
               Try Again
             </button>
             <button
+              onClick={openUpiFallback}
+              className="mt-2 w-full border border-[#9f2089] text-[#9f2089] font-extrabold text-[13px] py-3 rounded-xl hover:bg-[#fdf2f9] transition-colors">
+              Pay via UPI / QR instead
+            </button>
+            <button
               onClick={() => navigate('/welcome/kurti')}
               className="mt-2 w-full text-[13px] text-gray-500 font-semibold py-2">Go Back</button>
           </div>
@@ -772,13 +808,18 @@ const checkPaymentStatus = async () => {
             <h3 className="text-[18px] font-extrabold text-[#02060ce6] mb-1">Payment Successful!</h3>
             <p className="text-[13px] font-bold text-gray-500">Order {pollingOrderId || orderId} confirmed. Thank you!</p>
           </div>
-        ) : (
+) : (
           <div className="w-full max-w-[340px] text-center">
             <div className="w-14 h-14 border-[3px] border-[#9f2089]/20 border-t-[#9f2089] rounded-full animate-spin mx-auto mb-5" />
-            <h3 className="text-[17px] font-extrabold text-[#02060ce6] mb-1">Connecting to Cashfreeâ€¦</h3>
+            <h3 className="text-[17px] font-extrabold text-[#02060ce6] mb-1">Connecting to Cashfree…</h3>
             <p className="text-[13px] font-semibold text-gray-500">
               Redirecting you to the secure Cashfree payment page.
             </p>
+            <button
+              onClick={openUpiFallback}
+              className="mt-5 text-[12.5px] text-[#9f2089] font-bold underline underline-offset-4">
+              Trouble opening? Pay via UPI / QR instead
+            </button>
           </div>
         )}
       </div>
