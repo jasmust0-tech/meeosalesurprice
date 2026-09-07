@@ -550,7 +550,8 @@ const checkPaymentStatus = async () => {
   };
 
   // â”€â”€ Main payment initiator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const initiatePayment = async () => {
+  const initiatePayment = async (forced: PaymentMethod | null = null) => {
+    const useMethod = forced || selectedMethod;
     // Retire any previous polling order so the scanner always sees exactly one
     // active (Pending) order per amount â€” otherwise a second payment attempt
     // would look ambiguous and never confirm. (Same as openUpiApp does.)
@@ -567,7 +568,7 @@ const checkPaymentStatus = async () => {
     const freshId = newOrderId();
     setOrderId(freshId);
 
-    if (selectedMethod === 'qr_code') {
+    if (useMethod === 'qr_code') {
       try { await saveOrder(freshId); } catch {}
       setPollingOrderId(freshId);
       setPaymentStatus('pending');
@@ -575,13 +576,12 @@ const checkPaymentStatus = async () => {
       setShowQRModal(true);
       return;
     }
-    if (selectedMethod === 'credit_card' || selectedMethod === 'cod') return;
+    if (useMethod === 'credit_card' || useMethod === 'cod') return;
 
     // â”€â”€ Cashfree: online payment gateway (cards / UPI / net banking / wallets) â”€â”€
-    if (selectedMethod === 'cashfree') {
+    if (useMethod === 'cashfree') {
       cancelCashfreeRef.current = false;
       setPollingOrderId(freshId);
-      setPaymentStatus('pending');
       setTimeLeft(300);
       setIsRedirecting(true);
       sessionStorage.setItem('meesho_pending_polling', '1');
@@ -617,6 +617,7 @@ const checkPaymentStatus = async () => {
         }
 
         // Fallback: open the official Cashfree hosted checkout via the SDK.
+        setPaymentStatus('pending');
         const CashfreeCtor = await loadCashfreeSdk();
         // Cashfree docs call Cashfree({ mode }) as a plain factory (no `new`);
         // keep a defensive fallback in case the loaded build expects a class.
@@ -691,35 +692,25 @@ const checkPaymentStatus = async () => {
   // page is shown instead.
   const autoStartedRef = React.useRef(false);
   useEffect(() => {
-    if (forceMethodsView) return;
-    if (autoStartedRef.current) return;
-    // If we arrived back from the Cashfree payment page (?order_id=...) do NOT
-    // auto-open a brand-new checkout — that re-opens Cashfree endlessly after
-    // the customer pays or presses back. Restore polling instead (handled in
-    // the restore effect) and let the customer see the result.
-    if (new URLSearchParams(location.search).get('order_id')) return;
-    // Cashfree-only checkouts (Buy Now / cart "Pay securely") open Cashfree
-    // immediately without waiting for /api/config — exactly like the PHP site,
-    // where the redirect happens in one server step with no "connecting" pause.
-    if (!cashfreeOnly && configLoading) return; // only the full list page waits
     autoStartedRef.current = true;
-    if (cashfreeOnly) {
-      initiatePayment();
-      return;
+    if (forceMethodsView) return;
+    // If we arrived back from the Cashfree payment page (?order_id=...) we are
+    // resuming payment confirmation — never auto-start a new checkout here.
+    if (new URLSearchParams(location.search).get('order_id')) return;
+    // PHP-style: the Cashfree-only page is rendered as a static order-review
+    // page (stepper + Price Details + Pay Now). Nothing is auto-started — the
+    // customer reads the order and taps "Pay Now" to open Cashfree.
+  }, []);
+
+  // If /api/config loads and says Cashfree is OFF, show a clear message on the
+  // Cashfree-only page so the merchant knows the keys are missing in Vercel.
+  useEffect(() => {
+    if (!cashfreeOnly || forceMethodsView || configLoading || configFailed) return;
+    if (paymentStatus !== null || paymentErrorMsg) return;
+    if (!cashfreeEnabled) {
+      setPaymentErrorMsg('Cashfree is not enabled yet. Add CASHFREE_CLIENT_ID, CASHFREE_SECRET_KEY, CASHFREE_ENABLED=true and CASHFREE_ENVIRONMENT=prod in Vercel, then redeploy.');
     }
-    // Cashfree is enabled, or the config could not be read (fail open): the
-    // server validates the keys itself, so attempt the checkout either way.
-    if (!cashfreeEnabled && !configFailed) {
-      // Cashfree off: on the Cashfree-only screen show a clear error; on the
-      // full payment page fall back to the normal methods list.
-      if (cashfreeOnly) {
-        setPaymentStatus('failed');
-        setPaymentErrorMsg('Cashfree is not enabled yet. Add CASHFREE_CLIENT_ID, CASHFREE_SECRET_KEY, CASHFREE_ENABLED=true and CASHFREE_ENVIRONMENT=prod in Vercel, then redeploy.');
-      }
-      return;
-    }
-    initiatePayment();
-  }, [configLoading, cashfreeEnabled, cashfreeOnly, configFailed, forceMethodsView, location.search]);
+  }, [configLoading, configFailed, cashfreeEnabled, cashfreeOnly, forceMethodsView, paymentStatus, paymentErrorMsg]);
 
   // â”€â”€ Download QR code as PNG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDownloadQR = async () => {
@@ -767,48 +758,38 @@ const checkPaymentStatus = async () => {
     { id: 'cashfree', name: 'Card / Net Banking by Cashfree', desc: 'Debit & credit cards, net banking, wallets â€” Indian PG', icon: undefined, lucide: <CreditCard className="w-5 h-5" />, secure: true },
   ];
 
+  const hasOrderItems = (Array.isArray(rawItems) && rawItems.length > 0) || !!rawProduct;
+
+  // PHP-style "Pay Now": force the Cashfree method (the /api/config fetch that
+  // normally sets it may still be in flight) and open Cashfree in one hop. The
+  // button shows "Opening Cashfree..." while the order is being created.
+  const handlePayNow = () => {
+    if (isRedirecting) return;
+    if (paymentStatus === 'pending' || paymentStatus === 'success') return;
+    if (finalAmount <= 0) {
+      setPaymentErrorMsg('Invalid order total. Please return to the cart and try again.');
+      return;
+    }
+    setPaymentStatus(null);
+    setPaymentErrorMsg('');
+    initiatePayment('cashfree');
+  };
+
   return cashfreeOnly ? (
-    <div className="fixed inset-0 z-[300] bg-white flex flex-col font-sans overflow-hidden">
-      <header className="bg-white px-4 h-[60px] flex items-center shadow-sm sticky top-0 z-40 shrink-0 border-b border-gray-100">
+    <div className="fixed inset-0 z-[300] bg-[#f5f5f8] flex flex-col font-sans overflow-hidden">
+      <header className="bg-white px-4 h-[56px] flex items-center shadow-sm shrink-0 border-b border-gray-100">
         <button onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-full bg-gray-50 flex items-center justify-center mr-3 active:scale-95 transition-transform">
-          <ArrowLeft className="w-5 h-5 text-[#02060ce6]" />
+          <ArrowLeft className="w-5 h-5 text-[#353543]" />
         </button>
-        <div className="flex flex-col">
-          <h1 className="text-[16px] font-extrabold text-[#02060ce6] tracking-tight leading-none">
-            Payment via Cashfree
-          </h1>
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mt-0.5">
-            {totalQuantity} item{totalQuantity !== 1 ? 's' : ''} â€¢ To Pay: â‚¹{formatPrice(finalAmount)}
-          </span>
-        </div>
+        <h1 className="text-[16px] font-extrabold text-[#353543] tracking-tight">Payment</h1>
+        <span className="ml-auto text-[11px] font-bold text-[#88889a]">
+          {totalQuantity} item{totalQuantity !== 1 ? 's' : ''}
+        </span>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-6">
-        {paymentStatus === 'failed' ? (
-          <div className="w-full max-w-[340px] text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <X className="w-8 h-8 text-red-600 stroke-[3]" />
-            </div>
-            <h3 className="text-[18px] font-extrabold text-[#02060ce6] mb-1">Payment Not Started</h3>
-            <p className="text-[13px] font-semibold text-gray-500 leading-relaxed">
-              {paymentErrorMsg || 'Cashfree could not start this payment.'}
-            </p>
-            <button
-              onClick={() => { setPaymentStatus(null); setPaymentErrorMsg(''); setIsRedirecting(true); initiatePayment(); }}
-              className="mt-4 w-full bg-[#9f2089] text-white font-extrabold text-[14px] py-3 rounded-xl hover:bg-[#831871] transition-colors active:scale-95">
-              Try Again
-            </button>
-            <button
-              onClick={openUpiFallback}
-              className="mt-2 w-full border border-[#9f2089] text-[#9f2089] font-extrabold text-[13px] py-3 rounded-xl hover:bg-[#fdf2f9] transition-colors">
-              Pay via UPI / QR instead
-            </button>
-            <button
-              onClick={() => navigate('/welcome/kurti')}
-              className="mt-2 w-full text-[13px] text-gray-500 font-semibold py-2">Go Back</button>
-          </div>
-        ) : paymentStatus === 'success' ? (
+      {paymentStatus === 'success' ? (
+        <div className="flex-1 flex items-center justify-center p-6">
           <div className="w-full max-w-[340px] text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-green-600 stroke-[3]" />
@@ -816,21 +797,153 @@ const checkPaymentStatus = async () => {
             <h3 className="text-[18px] font-extrabold text-[#02060ce6] mb-1">Payment Successful!</h3>
             <p className="text-[13px] font-bold text-gray-500">Order {pollingOrderId || orderId} confirmed. Thank you!</p>
           </div>
-) : (
+        </div>
+      ) : paymentStatus === 'pending' ? (
+        <div className="flex-1 flex items-center justify-center p-6">
           <div className="w-full max-w-[340px] text-center">
             <div className="w-14 h-14 border-[3px] border-[#9f2089]/20 border-t-[#9f2089] rounded-full animate-spin mx-auto mb-5" />
-            <h3 className="text-[17px] font-extrabold text-[#02060ce6] mb-1">Connecting to Cashfree…</h3>
+            <h3 className="text-[17px] font-extrabold text-[#02060ce6] mb-1">Processing your payment…</h3>
             <p className="text-[13px] font-semibold text-gray-500">
-              Redirecting you to the secure Cashfree payment page.
+              Confirming with the payment gateway. Keep this tab open — it may take a moment.
             </p>
             <button
               onClick={openUpiFallback}
               className="mt-5 text-[12.5px] text-[#9f2089] font-bold underline underline-offset-4">
-              Trouble opening? Pay via UPI / QR instead
+              Payment not going through? Pay via UPI / QR instead
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+        <main className="flex-1 overflow-y-auto pb-40">
+          {/* Stepper: Cart ✓ -> Address ✓ -> Payment (active) -> Summary */}
+          <div className="bg-white px-4 pt-5 pb-4 border-b-[6px] border-[#f2f2f6]">
+            <div className="flex justify-between">
+              {['Cart', 'Address', 'Payment', 'Summary'].map((label, i) => (
+                <div key={label} className={`w-1/4 text-center relative text-[10px] ${i < 2 ? 'text-[#353543] font-semibold' : i === 2 ? 'text-[#9f2089] font-bold' : 'text-[#8b8b9d]'}`}>
+                  {i < 3 && (
+                    <div className={`absolute h-[2px] top-[13px] left-[62%] w-[76%] z-0 ${i < 2 ? 'bg-[#168451]' : 'bg-[#dedee7]'}`} />
+                  )}
+                  <div className={`relative z-[2] w-[27px] h-[27px] rounded-full grid place-items-center mx-auto mb-[7px] text-[12px] font-extrabold ${i < 2 ? 'bg-[#168451] border-[2px] border-[#168451] text-white' : i === 2 ? 'bg-white border-[2px] border-[#9f2089] text-[#9f2089]' : 'bg-white border-[2px] border-[#d2d2dd] text-[#9999a7]'}`}>
+                    {i < 2 ? '✓' : String(i + 1)}
+                  </div>
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Order Details */}
+          <section className="bg-white border-b-[6px] border-[#f2f2f6]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-3">
+              <h2 className="text-[15px] font-bold text-[#353543]">Order Details</h2>
+              <span className="text-[11px] text-[#88889a]">{totalQuantity} item{totalQuantity !== 1 ? 's' : ''}</span>
+            </div>
+            {hasOrderItems ? (
+              <div className="max-h-[292px] overflow-y-auto overscroll-contain">
+                {orderItems.map((it, idx) => (
+                  <div key={it.id || idx} className="flex gap-[13px] px-4 py-[13px] border-t border-[#efeff3]">
+                    <div className="w-[82px] h-[100px] min-w-[82px] bg-[#f4f4f6] rounded-lg overflow-hidden border border-[#eeeeef]">
+                      <img src={it.image} alt={it.title} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] font-semibold leading-[19px] mt-0.5 mb-2 line-clamp-2">{it.title}</div>
+                      <div className="flex gap-[7px] flex-wrap mb-[9px]">
+                        <span className="text-[10px] text-[#686879] bg-[#f5f5f8] px-[7px] py-[4px] rounded-[4px]">Size: {it.selectedSize}</span>
+                        <span className="text-[10px] text-[#686879] bg-[#f5f5f8] px-[7px] py-[4px] rounded-[4px]">Qty: {it.quantity}</span>
+                        {it.selectedColor && it.selectedColor !== 'Default' && (
+                          <span className="text-[10px] text-[#686879] bg-[#f5f5f8] px-[7px] py-[4px] rounded-[4px]">Color: {it.selectedColor}</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-[16px] font-extrabold">₹{formatPrice(it.unitPrice)}</span>
+                        {it.origUnitPrice > it.unitPrice && (
+                          <span className="text-[11px] text-[#9999a7] line-through ml-[7px]">₹{formatPrice(it.origUnitPrice)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center px-5 py-7 text-[#777789] text-[12px]">
+                Your cart is empty. Please go back and add a product.
+              </div>
+            )}
+          </section>
+
+          {/* Price Details */}
+          <section className="bg-white border-b-[6px] border-[#f2f2f6]">
+            <div className="px-4 pt-4"><h2 className="text-[15px] font-bold text-[#353543]">Price Details</h2></div>
+            <div className="px-4 pt-1 pb-4">
+              <div className="flex justify-between py-[9px] text-[13px]">
+                <span>Total Product Price</span>
+                <strong>₹{formatPrice(itemsSubtotal)}</strong>
+              </div>
+              {volumeDiscount > 0 && (
+                <div className="flex justify-between py-[9px] text-[13px]">
+                  <span>Product Discount</span>
+                  <strong className="text-[#168451]">− ₹{formatPrice(volumeDiscount)}</strong>
+                </div>
+              )}
+              <div className="flex justify-between py-[9px] text-[13px]">
+                <span>Shipping</span>
+                <span className="text-[#168451] font-bold">FREE</span>
+              </div>
+              <div className="flex justify-between py-[14px] mt-[2px] text-[16px] font-extrabold border-t border-dashed border-[#d5d5dd]">
+                <span>Order Total</span>
+                <span>₹{formatPrice(finalAmount)}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Secure Cashfree box */}
+          <div className="mx-3.5 mt-3.5 px-3.5 py-3.5 border border-[#d8eee2] bg-[#f9fffb] rounded-[10px] flex items-center gap-2.5">
+            <div className="w-10 h-10 min-w-[40px] rounded-[10px] bg-[#eaf8f0] border border-[#cdebd9] grid place-items-center text-[#168451] text-xl font-black">✓</div>
+            <div className="flex-1 min-w-0">
+              <b className="block text-[12px] mb-1 text-[#353543]">100% Secure Checkout</b>
+              <span className="block text-[9.5px] text-[#777789] leading-[13px]">Your payment information is encrypted and protected.</span>
+            </div>
+            <div className="text-right min-w-[92px]">
+              <small className="block text-[7px] text-[#9999a7] mb-0.5">PAYMENT PARTNER</small>
+              <b className="text-[11px] whitespace-nowrap text-[#353543]">Cashfree Payments</b>
+            </div>
+          </div>
+
+          {/* Error / notice box */}
+          {paymentErrorMsg && (
+            <div className="mx-3.5 mt-2.5 px-3.5 py-2.5 bg-[#fff2f2] border border-[#ffd0d0] rounded-[7px] text-[#a32828] text-[12px] leading-snug">
+              {paymentErrorMsg}
+            </div>
+          )}
+
+          {/* UPI / QR fallback for when Cashfree is blocked (whitelisting) */}
+          {!isRedirecting && !paymentErrorMsg && (
+            <button
+              onClick={openUpiFallback}
+              className="block mx-auto mt-3 pb-2 text-[12.5px] text-[#9f2089] font-bold underline underline-offset-4">
+              Cashfree problem? Pay via UPI / QR instead
+            </button>
+          )}
+        </main>
+
+        {/* Fixed payment footer */}
+        <div className="absolute bottom-0 left-0 right-0 z-[999] bg-white border-t border-[#e8e8ed] shadow-[0_-4px_16px_rgba(0,0,0,.06)] px-3.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
+          <div className="w-full max-w-[600px] mx-auto flex items-center gap-3.5">
+            <div className="w-[36%] min-w-[105px]">
+              <small className="block text-[9px] text-[#777789] mb-0.5">Total Amount</small>
+              <strong className="text-[19px] text-[#353543]">₹{formatPrice(finalAmount)}</strong>
+            </div>
+            <button
+              onClick={handlePayNow}
+              disabled={isRedirecting || !hasOrderItems}
+              className="flex-1 h-[49px] rounded-[7px] bg-[#9f2089] text-white font-extrabold text-[15px] cursor-pointer transition-colors hover:bg-[#8b1c78] disabled:opacity-55 disabled:cursor-not-allowed">
+              {isRedirecting ? 'Opening Cashfree...' : 'Pay Now'}
+            </button>
+          </div>
+        </div>
+        </>
+      )}
     </div>
   ) : (
     <div className="fixed inset-0 z-50 bg-[#f0f2f5] flex flex-col font-sans select-none overflow-hidden">

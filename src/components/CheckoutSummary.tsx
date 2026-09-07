@@ -2,7 +2,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronDown, ChevronUp, Package, Sparkles, Plus, Minus, Trash2 } from 'lucide-react';
 import { getCheckoutDraft, setCheckoutDraft } from '../data/checkoutDraft';
-import { genCheckoutOrderId, openCashfreeCheckout } from '../lib/cashfreeCheckout';
 
 interface CheckoutSummaryProps {
   onRemoveCartItem?: (id: string) => void;
@@ -159,20 +158,19 @@ export function CheckoutSummary({ onRemoveCartItem, onUpdateCartItemQuantity }: 
   };
 
   const handleContinue = () => {
-    const st = { 
-      ...location.state,
-      items: orderItems,
-      product: orderItems[0]?.product,
-      address,
-      totalPrice: displayPrice,
-      subtotal: itemsSubtotal,
-      volumeDiscountAmount,
-      totalQuantity,
-      itemsOriginalTotal,
-      autoCashfree: true
-    };
-    openCashfreeCheckout({ ...st, orderId: genCheckoutOrderId() }).catch(() => {
-      navigate('/checkout/payment', { state: st });
+    navigate('/checkout/payment', { 
+      state: { 
+        ...location.state,
+        items: orderItems,
+        product: orderItems[0]?.product,
+        address,
+        totalPrice: displayPrice,
+        subtotal: itemsSubtotal,
+        volumeDiscountAmount,
+        totalQuantity,
+        itemsOriginalTotal,
+        autoCashfree: true
+      } 
     });
   };
 
