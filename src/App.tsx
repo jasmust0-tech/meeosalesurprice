@@ -13,6 +13,7 @@ import { ResellerOrders } from './components/ResellerOrders';
 import { CheckoutAddress } from './components/CheckoutAddress';
 import { CheckoutSummary } from './components/CheckoutSummary';
 import { CheckoutPayment } from './components/CheckoutPayment';
+import { InfoPage } from './components/InfoPage';
 import { clearCheckoutDraft } from './data/checkoutDraft';
 import { hiddenTestProduct } from './data/hiddenProduct';
 import { OfferTimer } from './components/OfferTimer';
@@ -1077,7 +1078,15 @@ export default function App() {
             />
           } />
           <Route path="/checkout/payment" element={<CheckoutPayment />} />
-          
+
+          {/* Store info pages (required by the payment gateway's domain review) */}
+          <Route path="/about" element={<InfoPage page="about" />} />
+          <Route path="/contact" element={<InfoPage page="contact" />} />
+          <Route path="/terms" element={<InfoPage page="terms" />} />
+          <Route path="/refund-policy" element={<InfoPage page="refund" />} />
+          <Route path="/shipping-policy" element={<InfoPage page="shipping" />} />
+          <Route path="/privacy" element={<InfoPage page="privacy" />} />
+
           <Route path="/supplier" element={
             <div className="p-4 md:p-8">
               <SupplierDashboard
@@ -1234,6 +1243,14 @@ export default function App() {
         <footer className="bg-white border-t border-gray-200 mt-16 py-8 text-center text-xs text-gray-500">
           <div className="max-w-7xl mx-auto px-4 space-y-2">
             <p className="font-semibold text-gray-700">Online Shopping Store</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-1">
+              <button onClick={() => navigate('/about')} className="hover:text-[#9f2089] font-semibold">About Us</button>
+              <button onClick={() => navigate('/contact')} className="hover:text-[#9f2089] font-semibold">Contact</button>
+              <button onClick={() => navigate('/terms')} className="hover:text-[#9f2089] font-semibold">Terms</button>
+              <button onClick={() => navigate('/refund-policy')} className="hover:text-[#9f2089] font-semibold">Return &amp; Refund</button>
+              <button onClick={() => navigate('/shipping-policy')} className="hover:text-[#9f2089] font-semibold">Shipping</button>
+              <button onClick={() => navigate('/privacy')} className="hover:text-[#9f2089] font-semibold">Privacy</button>
+            </div>
             <p>© {new Date().getFullYear()} All rights reserved.</p>
           </div>
         </footer>
